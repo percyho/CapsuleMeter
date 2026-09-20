@@ -1,0 +1,21 @@
+mod usage;
+mod window_pos;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .manage(window_pos::WindowPosState(Default::default()))
+        .manage(window_pos::SnapState {
+            last_move: Default::default(),
+        })
+        .invoke_handler(tauri::generate_handler![usage::fetch_usage])
+        .setup(|app| {
+            window_pos::restore(app.handle());
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            window_pos::on_event(app_handle, event);
+        });
+}
