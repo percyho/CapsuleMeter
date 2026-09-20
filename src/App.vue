@@ -68,11 +68,6 @@ const showRightReset = ref(false);
 let leftTimer: number | undefined;
 let rightTimer: number | undefined;
 
-const planLabel = computed(() => {
-  const p = usage.value?.plan;
-  if (!p) return "···";
-  return p;
-});
 
 const leftValue = computed(() => {
   const w = usage.value?.five_hour;
@@ -207,7 +202,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="capsule" :class="{ error: lastError }" @mousedown="onCapsuleMouseDown">
-    <div class="badge" :title="lastError || 'Codex 套餐'">{{ planLabel }}</div>
     <div class="half left" @click="onLeftClick" :title="leftTitle">
       <div class="fill" :style="{ width: leftFillWidth }"></div>
       <span class="num" :class="{ dim: showLeftReset }">{{ leftDisplay }}</span>
@@ -311,21 +305,8 @@ body {
   padding: 0 3px;
 }
 
-.badge {
-  position: absolute;
-  top: 1px;
-  right: 4px;
-  z-index: 2;
-  font-size: 4.5px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.75);
-  text-transform: uppercase;
-  letter-spacing: 0.2px;
-  pointer-events: none;
-  line-height: 1;
-}
 
-.capsule.error .badge {
-  color: #ff6b6b;
-}
+
+
+
 </style>
