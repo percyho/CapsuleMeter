@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 import {
   enable as autostartEnable,
   disable as autostartDisable,
@@ -78,6 +78,16 @@ let rightTimer: number | undefined;
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
 const theme = ref(localStorage.getItem("theme") ?? "light");
+const panelTheme = ref(localStorage.getItem("panelTheme") ?? "dark");
+
+async function onQuit() {
+  const { exit } = await import("@tauri-apps/plugin-process");
+  exit(0);
+}
+
+function onPanelThemeChange() {
+  localStorage.setItem("panelTheme", panelTheme.value);
+}
 const alwaysOnTop = ref(localStorage.getItem("alwaysOnTop") !== "false");
 const snapEnabled = ref(localStorage.getItem("snapEnabled") !== "false");
 const displayMode = ref(localStorage.getItem("displayMode") ?? "remaining"); // remaining | used
@@ -335,7 +345,35 @@ function onPanelResizeEnd() {
   panelResize = null;
 }
 
-function togglePanel() {
+const panelAlignRight = ref(false);
+
+async function togglePanel() {
+  showPanel.value = !showPanel.value;
+  const win = getCurrentWindow() as any;
+  if (showPanel.value) {
+    // 用 screenX 判断（Tauri webview 中 screenX = 窗口在屏幕上的 x）
+    const winX = window.screenX;
+    const winY = window.screenY;
+    const screenW = window.screen.availWidth;
+    console.log("DEBUG:", { winX, winY, screenW, panelW: panelW.value });
+    panelAlignRight.value = (winX + panelW.value) > screenW;
+    await win.setSize(new LogicalSize(panelW.value, 30 + panelH.value));
+    if (panelAlignRight.value) {
+      await win.setPosition(new LogicalPosition(winX - (panelW.value - 100), winY));
+    }
+  } else {
+    // 关闭面板时恢复窗口宽度和位置
+    const winX = window.screenX;
+    const winY = window.screenY;
+    await win.setSize(new LogicalSize(100, 30));
+    if (panelAlignRight.value) {
+      await win.setPosition(new LogicalPosition(winX + (panelW.value - 100), winY));
+    }
+    panelAlignRight.value = false;
+  }
+}
+
+function _oldTogglePanel() {
   showPanel.value = !showPanel.value;
   const win = getCurrentWindow() as any;
   if (showPanel.value) {
@@ -393,7 +431,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="capsule" :class="{ error: lastError }" @mousedown="onCapsuleMouseDown" @contextmenu="onContextMenu">
+  <div class="capsule" :class="[{'error': lastError}, {'capsule-right': panelAlignRight}]" @mousedown="onCapsuleMouseDown" @contextmenu="onContextMenu">
     <div class="half left" @click="onLeftClick" :title="leftTitle">
       <div class="fill" :style="{ width: leftFillWidth }"></div>
       <span class="num" :class="{ dim: showLeftReset }">{{ leftDisplay }}</span>
@@ -404,10 +442,10 @@ onBeforeUnmount(() => {
     </div>
   </div>
 
-  <div v-if="showPanel" class="panel" :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
+  <div v-if="showPanel" class="panel" :class='[panelTheme, { "align-right": panelAlignRight }]' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
     <div class="panel-head">
       <span class="panel-title">设置</span>
-      <span class="panel-sub">{{ lastError ? "数据异常" : (usage?.plan || "未登录") }}</span>
+      <span class="panel-sub">{{ lastError ? "数据异常" : (usage?.plan || "未登录").toUpperCase() }}</span>
       <button class="panel-close" title="关闭" @click="togglePanel()">×</button>
     </div>
 
@@ -489,6 +527,7 @@ onBeforeUnmount(() => {
 
       <div class="panel-foot">
         <button class="btn-mini" @click="resetDefaults()">恢复默认</button>
+        <button class="btn-mini" @click="onQuit()">退出应用</button>
       </div>
     </div>
 
@@ -592,7 +631,7 @@ body {
   display: flex;
   flex-direction: column;
   background: rgba(24, 27, 35, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
   margin-top: 4px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
@@ -829,6 +868,26 @@ body {
   display: flex;
   justify-content: center;
   padding-top: 4px;
+}
+
+.panel.light {
+  --panel-bg: rgba(245, 247, 250, 0.97);
+  --panel-border: rgba(0, 0, 0, 0.1);
+  --panel-title: #1a1d26;
+  --panel-text: #2b2f3a;
+  --panel-sub: #5a6172;
+  --panel-val: #8a90a0;
+  --panel-accent: #4a6ee0;
+}
+
+.capsule-right {
+  position: absolute;
+  right: 0;
+}
+
+.panel.align-right {
+  left: auto;
+  right: 0;
 }
 
 .resize-handle {

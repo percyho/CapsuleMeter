@@ -45,23 +45,30 @@
 - 若登录过期（HTTP 401），窗口会显示错误提示，运行 `codex login` 或打开一次 Codex 应用即可刷新登录。
 - 贴边吸附基于 Windows 显示器工作区（自动避开任务栏），阈值 24 逻辑像素。
 
-## 使用
+## 常用命令
 
 ```bash
 # 安装依赖
-npm install
+pnpm install
 
 # 开发模式（热更新）
-npm run tauri dev
+pnpm dev
 
-# 构建安装包
-npm run tauri build
+# 打包（自动自增版本号）
+pnpm build:patch   # 修小 bug: 0.1.0 → 0.1.1
+pnpm build:minor   # 加新功能: 0.1.0 → 0.2.0
+pnpm build:major   # 大版本: 0.1.0 → 1.0.0
+
+# 仅自增版本号不打包
+node scripts/bump-version.js patch   # 或 minor / major
 ```
 
-构建产物：
+## 产物路径
 
-- 可执行文件：`src-tauri/target/release/codex-capsule.exe`
-- Windows 安装包：`src-tauri/target/release/bundle/nsis/CodexCapsule_0.1.0_x64-setup.exe`
+```
+可执行文件:  src-tauri/target/release/codex-capsule.exe
+安装包:      src-tauri/target/release/bundle/nsis/CodexCapsule_<版本>_x64-setup.exe
+```
 
 ## 项目结构
 
