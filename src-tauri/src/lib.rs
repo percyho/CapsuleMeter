@@ -16,6 +16,7 @@ pub fn run() {
         .manage(window_pos::SnapEnabled(Default::default()))
         .invoke_handler(tauri::generate_handler![
             usage::fetch_usage,
+            usage::fetch_analytics,
             window_pos::set_snap_enabled
         ])
         .setup(|app| {

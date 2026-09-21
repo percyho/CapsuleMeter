@@ -52,12 +52,12 @@
 pnpm install
 
 # 开发模式（热更新）
-pnpm dev
+pnpm tauri dev
 
 # 打包（自动自增版本号）
-pnpm build:patch   # 修小 bug: 0.1.0 → 0.1.1
-pnpm build:minor   # 加新功能: 0.1.0 → 0.2.0
-pnpm build:major   # 大版本: 0.1.0 → 1.0.0
+pnpm build:patch   # 修小 bug: 1.0.0 → 1.0.1
+pnpm build:minor   # 加新功能: 1.0.0 → 1.1.0
+pnpm build:major   # 大版本: 1.0.0 → 2.0.0
 
 # 仅自增版本号不打包
 node scripts/bump-version.js patch   # 或 minor / major

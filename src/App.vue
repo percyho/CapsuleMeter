@@ -79,6 +79,39 @@ const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
 const theme = ref(localStorage.getItem("theme") ?? "neon");
 const panelTheme = ref(localStorage.getItem("panelTheme") ?? "dark");
+const activeTab = ref("appearance");
+const analyticsTotal = ref("");
+const linePath = computed(() => {
+  if (historyPoints.value.length < 2) return "";
+  const pts = historyPoints.value.map(h => ({ x: h.t, y: h.p ?? 0 }));
+  const minT = pts[0].x, maxT = pts[pts.length-1].x;
+  const rangeT = maxT - minT || 1;
+  return pts.map((p, i) => {
+    const x = ((p.x - minT) / rangeT) * 280;
+    const y = 100 - (p.y / 100) * 100;
+    return (i === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+});
+
+const historyPoints = ref(JSON.parse(localStorage.getItem("usageHistory") || "[]"));
+function recordHistory() {
+  if (!usage.value) return;
+  const now = Date.now();
+  historyPoints.value.push({ t: now, p: usage.value.five_hour?.remaining_percent });
+  // 只保留最近 7 天
+  const cutoff = now - 7 * 86400000;
+  historyPoints.value = historyPoints.value.filter(h => h.t > cutoff);
+  localStorage.setItem("usageHistory", JSON.stringify(historyPoints.value));
+}
+const analyticsPeak = ref("");
+async function loadAnalytics() {
+  try {
+    const a = await invoke("fetch_analytics", { days: 30 });
+    if (a.error) return;
+    analyticsTotal.value = a.total_tokens ? (a.total_tokens / 1e6).toFixed(0) : "";
+    analyticsPeak.value = a.peak_tokens ? (a.peak_tokens / 1e6).toFixed(0) : "";
+  } catch {}
+}
 
 async function onQuit() {
   const { exit } = await import("@tauri-apps/plugin-process");
@@ -215,6 +248,7 @@ async function refresh() {
     loading.value = false;
   }
   lastRefresh.value = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  recordHistory();
 }
 
 let interval: number | undefined;
@@ -430,15 +464,23 @@ onBeforeUnmount(() => {
     </div>
   </div>
 
-  <div v-if="showPanel" class="panel" :class='[panelTheme, { "align-right": panelAlignRight }]' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
+  <div v-if="showPanel" class="panel" :class='[theme, { "align-right": panelAlignRight }]' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
     <div class="panel-head">
       <span class="panel-title">设置</span>
       <span class="panel-sub">{{ lastError ? "数据异常" : (usage?.plan || "未登录").toUpperCase() }}</span>
       <button class="panel-close" title="关闭" @click="togglePanel()">×</button>
     </div>
 
+
+    <div class="tabs">
+      <button class="tab" :class="{ on: activeTab==='appearance' }" @click="activeTab='appearance'" title="外观"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10h-10V2z"/><path d="M12 12l9.3-9.3"/><path d="M12 12l-6 6"/></svg></button>
+      <button class="tab" :class="{ on: activeTab==='behavior' }" @click="activeTab='behavior'" title="行为"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="tab" :class="{ on: activeTab==='stats' }" @click="activeTab='stats'; loadAnalytics()" title="统计"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></button>
+      <button class="tab" :class="{ on: activeTab==='system' }" @click="activeTab='system'" title="系统"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button>
+    </div>
+
     <div class="panel-body">
-      <div class="group-label">外观</div>
+      <template v-if="activeTab==='appearance'">
       <div class="row">
         <span class="row-name">主题</span>
         <div class="themes">
@@ -458,6 +500,9 @@ onBeforeUnmount(() => {
         <span class="row-val">{{ fontSize }}px</span>
       </div>
 
+      </template>
+
+      <template v-if="activeTab==='behavior'">
       <div class="group-label">行为</div>
       <div class="row">
         <span class="row-name">窗口置顶</span>
@@ -505,6 +550,23 @@ onBeforeUnmount(() => {
         <button class="btn-mini" @click="refresh()">立即刷新</button>
       </div>
 
+      </template>
+
+      <template v-if="activeTab==='stats'">
+      <div class="group-label">用量历史（本地记录）</div>
+      <div v-if="historyPoints.length < 2" class="chart-hint">数据积累中，至少需要 2 个采样点</div>
+      <svg v-else class="chart" viewBox="0 0 280 100" preserveAspectRatio="none">
+        <line x1="0" y1="25" x2="280" y2="25" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+        <line x1="0" y1="50" x2="280" y2="50" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+        <line x1="0" y1="75" x2="280" y2="75" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+        <path :d="linePath" fill="none" stroke="var(--accent, #7c5cff)" stroke-width="1.5"/>
+      </svg>
+      <div class="chart-axis"><span>0%</span><span>50%</span><span>100%</span></div>
+      <div class="row"><span class="row-name">采样点数</span><span class="row-val">{{ historyPoints.length }}</span></div>
+
+      </template>
+
+      <template v-if="activeTab==='system'">
       <div class="group-label">系统</div>
       <div class="row">
         <span class="row-name">开机自启</span>
@@ -512,6 +574,12 @@ onBeforeUnmount(() => {
           <span class="knob"></span>
         </button>
       </div>
+
+      <div class="group-label">关于</div>
+      <div class="row"><span class="row-name">版本</span><span class="row-val">v1.0.0</span></div>
+      <div class="row privacy-row"><span class="row-name">隐私</span><p class="privacy-text">本地运行，不上传数据</p></div>
+      <div class="row"><span class="row-name">许可证</span><span class="row-val">MIT</span></div>
+      </template>
 
       <div class="panel-foot">
         <button class="btn-mini" @click="resetDefaults()">恢复默认</button>
@@ -618,7 +686,7 @@ body {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  background: rgba(24, 27, 35, 0.97);
+  background: var(--panel-bg, rgba(24, 27, 35, 0.97));
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
   margin-top: 4px;
@@ -669,6 +737,30 @@ body {
 .panel-close:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--panel-val, #7f8799);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+}
+
+.tab.on {
+  background: var(--panel-bg-active, rgba(255,255,255,0.08));
+  color: var(--panel-text, #fff);
+  font-weight: 600;
 }
 
 .panel-body {
@@ -852,7 +944,33 @@ body {
   color: #fff;
 }
 
+.chart {
+  width: 100%;
+  height: 100px;
+  margin: 8px 0;
+}
+
+.chart-hint {
+  padding: 20px 0;
+  text-align: center;
+  color: var(--panel-val, #666);
+  font-size: 12px;
+}
+
+.privacy-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+.privacy-text { font-size: 12px; color: var(--panel-val, #888); line-height: 1.5; margin: 0; }
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--panel-val, #666);
+  margin-bottom: 8px;
+}
+
 .panel-foot {
+  padding: 8px 12px;
+  gap: 8px;
   display: flex;
   justify-content: center;
   padding-top: 4px;
