@@ -77,7 +77,7 @@ let rightTimer: number | undefined;
 // —— 可配置项（localStorage 持久化）——
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
-const theme = ref(localStorage.getItem("theme") ?? "light");
+const theme = ref(localStorage.getItem("theme") ?? "neon");
 const panelTheme = ref(localStorage.getItem("panelTheme") ?? "dark");
 
 async function onQuit() {
@@ -85,9 +85,7 @@ async function onQuit() {
   exit(0);
 }
 
-function onPanelThemeChange() {
-  localStorage.setItem("panelTheme", panelTheme.value);
-}
+
 const alwaysOnTop = ref(localStorage.getItem("alwaysOnTop") !== "false");
 const snapEnabled = ref(localStorage.getItem("snapEnabled") !== "false");
 const displayMode = ref(localStorage.getItem("displayMode") ?? "remaining"); // remaining | used
@@ -228,7 +226,7 @@ watch(refreshMin, restartInterval);
 
 // —— 外观 ——
 function applyTheme() {
-  const t = THEMES[theme.value] || THEMES.light;
+  const t = THEMES[theme.value] || THEMES.neon;
   const root = document.documentElement.style;
   root.setProperty("--bg", t.bg);
   root.setProperty("--left-fill", t.left);
@@ -373,16 +371,6 @@ async function togglePanel() {
   }
 }
 
-function _oldTogglePanel() {
-  showPanel.value = !showPanel.value;
-  const win = getCurrentWindow() as any;
-  if (showPanel.value) {
-    win.setSize(new LogicalSize(panelW.value, 30 + panelH.value));
-  } else {
-    win.setSize(new LogicalSize(300, 225));
-  }
-}
-
 function onContextMenu(e: MouseEvent) {
   e.preventDefault();
   togglePanel();
@@ -392,7 +380,7 @@ function onContextMenu(e: MouseEvent) {
 function resetDefaults() {
   opacity.value = 0.72;
   fontSize.value = 13;
-  theme.value = "light";
+  theme.value = "neon";
   alwaysOnTop.value = true;
   snapEnabled.value = true;
   displayMode.value = "remaining";
