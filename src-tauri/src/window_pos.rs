@@ -12,6 +12,17 @@ pub struct SnapState {
     pub last_move: Arc<Mutex<Option<Instant>>>,
 }
 
+/// 贴边吸附功能开关（由设置面板控制）
+pub struct SnapEnabled(pub Mutex<bool>);
+
+/// 设置吸附开关状态
+#[tauri::command]
+pub fn set_snap_enabled(state: tauri::State<SnapEnabled>, enabled: bool) {
+    if let Ok(mut inner) = state.0.lock() {
+        *inner = enabled;
+    }
+}
+
 /// 吸附判定延迟：拖动停止这么久之后才执行吸附
 const SNAP_DELAY_MS: u64 = 250;
 /// 吸附重试次数：拖动停止后系统可能补发 Moved 事件，需要重试直到真正空闲
@@ -166,7 +177,14 @@ pub fn on_event(app: &AppHandle, event: RunEvent) {
                         None => false,
                     };
                     if idle {
-                        snap_window(&app2);
+                        // 仅在吸附开关打开时执行贴边吸附
+                        let snap_on = app2
+                            .try_state::<SnapEnabled>()
+                            .map(|s| s.0.lock().map(|g| *g).unwrap_or(false))
+                            .unwrap_or(false);
+                        if snap_on {
+                            snap_window(&app2);
+                        }
                         break;
                     }
                 }

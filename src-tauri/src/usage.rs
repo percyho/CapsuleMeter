@@ -104,6 +104,59 @@ fn load_auth() -> Result<(String, String), String> {
     Ok((access, account))
 }
 
+/// 读取 Windows 系统代理（注册表 Internet Settings），返回 http://host:port
+#[cfg(windows)]
+fn system_proxy_url() -> Option<String> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let settings = hkcu
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings")
+        .ok()?;
+    let enable: u32 = settings.get_value("ProxyEnable").ok()?;
+    if enable != 1 {
+        return None;
+    }
+    let server: String = settings.get_value("ProxyServer").ok()?;
+    if server.is_empty() {
+        return None;
+    }
+    // ProxyServer 可能是 "host:port" 或 "http=host:port;https=host:port"
+    let addr = if server.contains('=') {
+        server
+            .split(';')
+            .find_map(|kv| kv.strip_prefix("https=").or_else(|| kv.strip_prefix("http=")))
+            .unwrap_or("")
+            .to_string()
+    } else {
+        server
+    };
+    if addr.is_empty() {
+        return None;
+    }
+    Some(format!("http://{}", addr.trim_end_matches('/')))
+}
+
+#[cfg(not(windows))]
+fn system_proxy_url() -> Option<String> {
+    None
+}
+
+/// 构建 HTTP 客户端：自动使用 Windows 系统代理（如 Clash），未配置则直连
+fn build_http_client() -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("codex-cli");
+    if let Some(proxy) = system_proxy_url() {
+        builder = builder.proxy(
+            reqwest::Proxy::all(&proxy).map_err(|e| format!("代理配置失败 {}：{}", proxy, e))?,
+        );
+    }
+    builder
+        .build()
+        .map_err(|e| format!("初始化 HTTP 客户端失败：{}", e))
+}
+
 fn to_window(w: Option<&RawWindow>) -> WindowData {
     let Some(w) = w else {
         return empty_window();
@@ -132,11 +185,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
         }
     };
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .user_agent("codex-cli")
-        .build()
-        .map_err(|e| format!("初始化 HTTP 客户端失败：{}", e))?;
+    let client = build_http_client()?;
 
     let mut req = client.get(USAGE_URL).bearer_auth(&access);
     if !account.is_empty() {

@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import {
+  enable as autostartEnable,
+  disable as autostartDisable,
+  isEnabled as autostartIsEnabled,
+} from "@tauri-apps/plugin-autostart";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
@@ -61,6 +66,7 @@ interface UsageData {
 const usage = ref<UsageData | null>(null);
 const loading = ref(true);
 const lastError = ref<string | null>(null);
+const lastRefresh = ref("--");
 
 // 当前左侧/右侧是否正在显示重置时间
 const showLeftReset = ref(false);
@@ -68,19 +74,39 @@ const showRightReset = ref(false);
 let leftTimer: number | undefined;
 let rightTimer: number | undefined;
 
+// —— 可配置项（localStorage 持久化）——
+const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
+const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
+const theme = ref(localStorage.getItem("theme") ?? "light");
+const alwaysOnTop = ref(localStorage.getItem("alwaysOnTop") !== "false");
+const snapEnabled = ref(localStorage.getItem("snapEnabled") !== "false");
+const displayMode = ref(localStorage.getItem("displayMode") ?? "remaining"); // remaining | used
+const refreshMin = ref(Number(localStorage.getItem("refreshMin") ?? "5"));
+const resetShowSec = ref(Number(localStorage.getItem("resetShowSec") ?? "5"));
+const autostart = ref(false);
+
+const THEMES: Record<string, { bg: string; left: string; right: string; num: string; name: string }> = {
+  light: { bg: "linear-gradient(180deg, rgba(233,236,241,0.72), rgba(199,204,214,0.72))", left: "rgba(255,255,255,0.85)", right: "rgba(238,96,100,0.82)", num: "#2b2f3a", name: "浅灰" },
+  dark: { bg: "linear-gradient(180deg, rgba(50,54,66,0.78), rgba(30,33,42,0.78))", left: "rgba(120,160,255,0.7)", right: "rgba(255,130,130,0.7)", num: "#e8eaf0", name: "深色" },
+  forest: { bg: "linear-gradient(180deg, rgba(220,235,220,0.72), rgba(180,205,185,0.72))", left: "rgba(120,200,140,0.75)", right: "rgba(240,160,90,0.75)", num: "#2d3a30", name: "森林" },
+  sunset: { bg: "linear-gradient(180deg, rgba(245,220,200,0.72), rgba(220,180,170,0.72))", left: "rgba(255,200,120,0.75)", right: "rgba(220,90,120,0.75)", num: "#3a2b2b", name: "晚霞" }
+};
+
+// —— 显示值（支持剩余/已用模式切换）——
+function pickPct(w: WindowData | undefined): number | null {
+  if (!w) return null;
+  const v = displayMode.value === "used" ? w.used_percent : w.remaining_percent;
+  return v === null || v === undefined ? null : v;
+}
 
 const leftValue = computed(() => {
-  const w = usage.value?.five_hour;
-  if (!w || w.remaining_percent === null || w.remaining_percent === undefined)
-    return "--";
-  return String(Math.round(w.remaining_percent));
+  const v = pickPct(usage.value?.five_hour);
+  return v === null ? "--" : String(Math.round(v));
 });
 
 const rightValue = computed(() => {
-  const w = usage.value?.weekly;
-  if (!w || w.remaining_percent === null || w.remaining_percent === undefined)
-    return "--";
-  return String(Math.round(w.remaining_percent));
+  const v = pickPct(usage.value?.weekly);
+  return v === null ? "--" : String(Math.round(v));
 });
 
 /** 把重置时间戳格式化为准确时间：当天显示 HH:MM，跨天显示 M/D HH:MM */
@@ -95,10 +121,10 @@ function fmtClock(epochSec: number | null): string {
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate();
   if (sameDay) return `${hh}:${mm}`;
-  return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-// 左侧点击：显示 5 小时重置倒计时，5 秒后恢复
+// 左侧点击：显示 5 小时重置时间，N 秒后恢复
 function onLeftClick() {
   if (usage.value?.error) return;
   showLeftReset.value = !showLeftReset.value;
@@ -106,11 +132,11 @@ function onLeftClick() {
   if (showLeftReset.value) {
     leftTimer = window.setTimeout(() => {
       showLeftReset.value = false;
-    }, 5000);
+    }, resetShowSec.value * 1000);
   }
 }
 
-// 右侧点击：显示周重置倒计时，5 秒后恢复
+// 右侧点击：显示周重置时间，N 秒后恢复
 function onRightClick() {
   if (usage.value?.error) return;
   showRightReset.value = !showRightReset.value;
@@ -118,7 +144,7 @@ function onRightClick() {
   if (showRightReset.value) {
     rightTimer = window.setTimeout(() => {
       showRightReset.value = false;
-    }, 5000);
+    }, resetShowSec.value * 1000);
   }
 }
 
@@ -158,20 +184,17 @@ const rightTitle = computed(() => {
   return w?.reset_at ? `周重置于 ${fmtClock(w.reset_at)}` : "";
 });
 
-// 剩余量填充宽度：剩余多少百分比就填充多少（用量满=全填，用光=全透明）
+// 剩余量填充宽度：按当前显示模式取对应百分比
 const leftFillWidth = computed(() => {
-  const w = usage.value?.five_hour;
-  if (!w || w.remaining_percent === null || w.remaining_percent === undefined)
-    return "0%";
-  return `${Math.max(0, Math.min(100, w.remaining_percent))}%`;
+  const v = pickPct(usage.value?.five_hour);
+  return v === null ? "0%" : `${Math.max(0, Math.min(100, v))}%`;
 });
 const rightFillWidth = computed(() => {
-  const w = usage.value?.weekly;
-  if (!w || w.remaining_percent === null || w.remaining_percent === undefined)
-    return "0%";
-  return `${Math.max(0, Math.min(100, w.remaining_percent))}%`;
+  const v = pickPct(usage.value?.weekly);
+  return v === null ? "0%" : `${Math.max(0, Math.min(100, v))}%`;
 });
 
+// —— 数据刷新 ——
 async function refresh() {
   try {
     const data = await invoke<UsageData>("fetch_usage");
@@ -183,23 +206,17 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
+  lastRefresh.value = new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
 let interval: number | undefined;
+function restartInterval() {
+  if (interval) window.clearInterval(interval);
+  interval = window.setInterval(refresh, refreshMin.value * 60 * 1000);
+}
+watch(refreshMin, restartInterval);
 
-// —— 右键设置面板 ——
-const showPanel = ref(false);
-const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
-const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
-const theme = ref(localStorage.getItem("theme") ?? "light");
-
-const THEMES: Record<string, { bg: string; left: string; right: string; num: string; name: string }> = {
-  light: { bg: "linear-gradient(180deg, rgba(233,236,241,0.72), rgba(199,204,214,0.72))", left: "rgba(255,255,255,0.85)", right: "rgba(238,96,100,0.82)", num: "#2b2f3a", name: "浅灰" },
-  dark: { bg: "linear-gradient(180deg, rgba(50,54,66,0.78), rgba(30,33,42,0.78))", left: "rgba(120,160,255,0.7)", right: "rgba(255,130,130,0.7)", num: "#e8eaf0", name: "深色" },
-  forest: { bg: "linear-gradient(180deg, rgba(220,235,220,0.72), rgba(180,205,185,0.72))", left: "rgba(120,200,140,0.75)", right: "rgba(240,160,90,0.75)", num: "#2d3a30", name: "森林" },
-  sunset: { bg: "linear-gradient(180deg, rgba(245,220,200,0.72), rgba(220,180,170,0.72))", left: "rgba(255,200,120,0.75)", right: "rgba(220,90,120,0.75)", num: "#3a2b2b", name: "晚霞" }
-};
-
+// —— 外观 ——
 function applyTheme() {
   const t = THEMES[theme.value] || THEMES.light;
   const root = document.documentElement.style;
@@ -214,8 +231,85 @@ function onThemeChange() {
   applyTheme();
 }
 
-const panelW = ref(Number(localStorage.getItem("panelW") ?? "300"));
-const panelH = ref(Number(localStorage.getItem("panelH") ?? "225"));
+function applyWindowSettings() {
+  applyTheme();
+  document.body.style.opacity = String(opacity.value);
+  document.documentElement.style.setProperty("--num-size", fontSize.value + "px");
+}
+
+function onOpacityChange() {
+  localStorage.setItem("opacity", String(opacity.value));
+  applyWindowSettings();
+}
+function onFontSizeChange() {
+  localStorage.setItem("fontSize", String(fontSize.value));
+  applyWindowSettings();
+}
+
+// —— 行为 ——
+async function applyAlwaysOnTop() {
+  try {
+    await getCurrentWindow().setAlwaysOnTop(alwaysOnTop.value);
+  } catch {}
+}
+function onAlwaysOnTopChange() {
+  localStorage.setItem("alwaysOnTop", String(alwaysOnTop.value));
+  applyAlwaysOnTop();
+}
+
+async function applySnap() {
+  try {
+    await invoke("set_snap_enabled", { enabled: snapEnabled.value });
+  } catch {}
+}
+function onSnapChange() {
+  localStorage.setItem("snapEnabled", String(snapEnabled.value));
+  applySnap();
+}
+
+function onDisplayModeChange() {
+  localStorage.setItem("displayMode", displayMode.value);
+}
+
+function onResetShowSecChange() {
+  localStorage.setItem("resetShowSec", String(resetShowSec.value));
+  // 若正在显示重置时间，立即用新时长重新计时
+  if (showLeftReset.value) {
+    clearTimer("left");
+    leftTimer = window.setTimeout(() => { showLeftReset.value = false; }, resetShowSec.value * 1000);
+  }
+  if (showRightReset.value) {
+    clearTimer("right");
+    rightTimer = window.setTimeout(() => { showRightReset.value = false; }, resetShowSec.value * 1000);
+  }
+}
+
+// —— 系统：开机自启 ——
+async function initAutostart() {
+  try {
+    autostart.value = await autostartIsEnabled();
+  } catch {
+    autostart.value = localStorage.getItem("autostart") === "true";
+  }
+}
+async function onAutostartChange() {
+  try {
+    if (autostart.value) {
+      await autostartEnable();
+    } else {
+      await autostartDisable();
+    }
+    localStorage.setItem("autostart", String(autostart.value));
+  } catch {
+    // 操作失败时回滚开关状态
+    autostart.value = !autostart.value;
+  }
+}
+
+// —— 面板 ——
+const showPanel = ref(false);
+const panelW = ref(Math.min(300, Math.max(120, Number(localStorage.getItem("panelW") ?? "300"))));
+const panelH = ref(Math.min(400, Math.max(80, Number(localStorage.getItem("panelH") ?? "195"))));
 let panelResize: { sx: number; sy: number; w: number; h: number } | null = null;
 
 function onPanelResizeStart(e: MouseEvent) {
@@ -230,7 +324,7 @@ function onPanelResizeMove(e: MouseEvent) {
   const dx = e.clientX - panelResize.sx;
   const dy = e.clientY - panelResize.sy;
   panelW.value = Math.max(120, Math.min(300, panelResize.w + dx));
-  panelH.value = Math.max(80, Math.min(200, panelResize.h + dy));
+  panelH.value = Math.max(80, Math.min(400, panelResize.h + dy));
   getCurrentWindow().setSize(new LogicalSize(panelW.value, 30 + panelH.value));
 }
 function onPanelResizeEnd() {
@@ -241,21 +335,13 @@ function onPanelResizeEnd() {
   panelResize = null;
 }
 
-function applyWindowSettings() {
-  try {
-    applyTheme();
-    document.body.style.opacity = String(opacity.value);
-    document.documentElement.style.setProperty("--num-size", fontSize.value + "px");
-  } catch {}
-}
-
 function togglePanel() {
   showPanel.value = !showPanel.value;
   const win = getCurrentWindow() as any;
   if (showPanel.value) {
     win.setSize(new LogicalSize(panelW.value, 30 + panelH.value));
   } else {
-    win.setSize(new LogicalSize(100, 30));
+    win.setSize(new LogicalSize(300, 225));
   }
 }
 
@@ -264,21 +350,39 @@ function onContextMenu(e: MouseEvent) {
   togglePanel();
 }
 
-
-function onOpacityChange() {
-  localStorage.setItem("opacity", String(opacity.value));
+// —— 恢复默认 ——
+function resetDefaults() {
+  opacity.value = 0.72;
+  fontSize.value = 13;
+  theme.value = "light";
+  alwaysOnTop.value = true;
+  snapEnabled.value = true;
+  displayMode.value = "remaining";
+  refreshMin.value = 5;
+  resetShowSec.value = 5;
+  panelW.value = 300;
+  panelH.value = 195;
+  ["opacity", "fontSize", "theme", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "panelW", "panelH"].forEach((k) =>
+    localStorage.removeItem(k)
+  );
   applyWindowSettings();
-}
-function onFontSizeChange() {
-  localStorage.setItem("fontSize", String(fontSize.value));
-  applyWindowSettings();
+  applyAlwaysOnTop();
+  applySnap();
+  restartInterval();
+  if (autostart.value) {
+    autostart.value = false;
+    onAutostartChange();
+  }
+  getCurrentWindow().setSize(new LogicalSize(300, 225));
 }
 
 onMounted(() => {
   applyWindowSettings();
+  applyAlwaysOnTop();
+  applySnap();
+  initAutostart();
   refresh();
-  // 每 5 分钟自动刷新一次
-  interval = window.setInterval(refresh, 5 * 60 * 1000);
+  restartInterval();
 });
 
 onBeforeUnmount(() => {
@@ -299,21 +403,96 @@ onBeforeUnmount(() => {
       <span class="num" :class="{ dim: showRightReset }">{{ rightDisplay }}</span>
     </div>
   </div>
-  <div v-if="showPanel" class="panel" :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
-    <div class="row themes">
-      <button v-for="(_, key) in THEMES" :key="key" class="theme-dot" :class="{ active: theme === key }"
-              :title="THEMES[key].name" @click="theme = key; onThemeChange()"></button>
-    </div>
-    <div class="resize-handle" @mousedown="onPanelResizeStart"></div>
 
-    <label class="row">
-      <span>透明度</span>
-      <input type="range" min="0.3" max="1" step="0.05" v-model.number="opacity" @input="onOpacityChange" />
-    </label>
-    <label class="row">
-      <span>字号</span>
-      <input type="range" min="9" max="20" step="1" v-model.number="fontSize" @input="onFontSizeChange" />
-    </label>
+  <div v-if="showPanel" class="panel" :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
+    <div class="panel-head">
+      <span class="panel-title">设置</span>
+      <span class="panel-sub">{{ lastError ? "数据异常" : (usage?.plan || "未登录") }}</span>
+      <button class="panel-close" title="关闭" @click="togglePanel()">×</button>
+    </div>
+
+    <div class="panel-body">
+      <div class="group-label">外观</div>
+      <div class="row">
+        <span class="row-name">主题</span>
+        <div class="themes">
+          <button v-for="(_, key) in THEMES" :key="key" class="theme-dot" :class="{ active: theme === key }"
+                  :title="THEMES[key].name" @click="theme = key; onThemeChange()"></button>
+        </div>
+        <span class="row-val">{{ THEMES[theme]?.name || "" }}</span>
+      </div>
+      <div class="row">
+        <span class="row-name">透明度</span>
+        <input type="range" min="0.3" max="1" step="0.05" v-model.number="opacity" @input="onOpacityChange" />
+        <span class="row-val">{{ Math.round(opacity * 100) }}%</span>
+      </div>
+      <div class="row">
+        <span class="row-name">字号</span>
+        <input type="range" min="9" max="20" step="1" v-model.number="fontSize" @input="onFontSizeChange" />
+        <span class="row-val">{{ fontSize }}px</span>
+      </div>
+
+      <div class="group-label">行为</div>
+      <div class="row">
+        <span class="row-name">窗口置顶</span>
+        <button class="switch" :class="{ on: alwaysOnTop }" @click="alwaysOnTop = !alwaysOnTop; onAlwaysOnTopChange()">
+          <span class="knob"></span>
+        </button>
+      </div>
+      <div class="row">
+        <span class="row-name">贴边吸附</span>
+        <button class="switch" :class="{ on: snapEnabled }" @click="snapEnabled = !snapEnabled; onSnapChange()">
+          <span class="knob"></span>
+        </button>
+      </div>
+      <div class="row">
+        <span class="row-name">显示模式</span>
+        <div class="seg">
+          <button :class="{ on: displayMode === 'remaining' }" @click="displayMode = 'remaining'; onDisplayModeChange()">剩余</button>
+          <button :class="{ on: displayMode === 'used' }" @click="displayMode = 'used'; onDisplayModeChange()">已用</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="row-name">重置显示时长</span>
+        <select v-model.number="resetShowSec" @change="onResetShowSecChange()">
+          <option :value="3">3 秒</option>
+          <option :value="5">5 秒</option>
+          <option :value="8">8 秒</option>
+          <option :value="10">10 秒</option>
+        </select>
+      </div>
+
+      <div class="group-label">数据</div>
+      <div class="row">
+        <span class="row-name">自动刷新</span>
+        <select v-model.number="refreshMin" @change="restartInterval()">
+          <option :value="1">1 分钟</option>
+          <option :value="2">2 分钟</option>
+          <option :value="5">5 分钟</option>
+          <option :value="10">10 分钟</option>
+          <option :value="30">30 分钟</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="row-name">上次刷新</span>
+        <span class="row-val">{{ lastRefresh }}</span>
+        <button class="btn-mini" @click="refresh()">立即刷新</button>
+      </div>
+
+      <div class="group-label">系统</div>
+      <div class="row">
+        <span class="row-name">开机自启</span>
+        <button class="switch" :class="{ on: autostart }" @click="autostart = !autostart; onAutostartChange()">
+          <span class="knob"></span>
+        </button>
+      </div>
+
+      <div class="panel-foot">
+        <button class="btn-mini" @click="resetDefaults()">恢复默认</button>
+      </div>
+    </div>
+
+    <div class="resize-handle" @mousedown="onPanelResizeStart"></div>
   </div>
 </template>
 
@@ -364,7 +543,7 @@ body {
   overflow: hidden;
 }
 
-/* 剩余量填充层：剩余多少就填多少，已用部分透明露出胶囊底色 */
+/* 填充层：按当前显示模式从中间分隔线向外填充 */
 .fill {
   position: absolute;
   right: 0;
@@ -396,7 +575,7 @@ body {
 }
 
 .num.dim {
-  font-size: 6.5px;
+  font-size: calc(var(--num-size, 13px) * 0.78);
   font-weight: 600;
   color: #5a6172;
   opacity: 1;
@@ -404,48 +583,144 @@ body {
   padding: 0 3px;
 }
 
-
-
-
-
-/* 设置面板 */
+/* —— 设置面板 —— */
 .panel {
-  position: absolute;
   position: fixed;
   top: 30px;
   left: 0;
   z-index: 10;
-  background: rgba(30, 33, 42, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 6px 8px;
-  margin-top: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  background: rgba(24, 27, 35, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  margin-top: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
 }
 
-.panel .row {
+.panel-head {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e8eaf0;
+  letter-spacing: 1px;
+}
+
+.panel-sub {
+  flex: 1;
   font-size: 9px;
+  color: #6b8af0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-close {
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #9aa1b5;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.panel-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.panel-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.panel-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+.group-label {
+  font-size: 9px;
+  color: #6b8af0;
+  letter-spacing: 2px;
+  margin-top: 5px;
+  padding: 2px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.group-label:first-child {
+  margin-top: 2px;
+  border-top: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 10px;
   color: #d8dce6;
 }
 
+.row-name {
+  flex: 0 0 66px;
+  color: #aab2c5;
+}
+
+.row-val {
+  font-size: 9px;
+  color: #7f8799;
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row input[type="range"] {
+  flex: 1;
+  height: 3px;
+  accent-color: #6b8af0;
+  min-width: 0;
+}
+
+/* 主题色板 */
 .themes {
-  justify-content: center;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
 }
 
 .theme-dot {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .theme-dot.active {
@@ -458,10 +733,102 @@ body {
 .theme-dot:nth-child(3) { background: #78c88c; }
 .theme-dot:nth-child(4) { background: #f0a878; }
 
-.panel input[type="range"] {
-  flex: 1;
-  height: 3px;
-  accent-color: #6b8af0;
+/* 开关 */
+.switch {
+  width: 30px;
+  height: 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s ease;
+}
+
+.switch.on {
+  background: #6b8af0;
+  border-color: #6b8af0;
+}
+
+.switch.on .knob {
+  left: 16px;
+}
+
+/* 分段选择 */
+.seg {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.seg button {
+  background: transparent;
+  border: none;
+  color: #9aa1b5;
+  font-size: 9px;
+  padding: 2px 9px;
+  cursor: pointer;
+  line-height: 12px;
+}
+
+.seg button.on {
+  background: #6b8af0;
+  color: #fff;
+}
+
+/* 下拉选择 */
+.panel select {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d8dce6;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 2px 4px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.panel select option {
+  background: #242936;
+  color: #d8dce6;
+}
+
+/* 小按钮 */
+.btn-mini {
+  background: rgba(107, 138, 240, 0.16);
+  color: #8fa7f5;
+  border: 1px solid rgba(107, 138, 240, 0.35);
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 2px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-mini:hover {
+  background: rgba(107, 138, 240, 0.3);
+  color: #fff;
+}
+
+.panel-foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
 }
 
 .resize-handle {
@@ -472,12 +839,5 @@ body {
   height: 12px;
   cursor: nwse-resize;
   background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.25) 50%);
-}
-
-.panel input[type="checkbox"] {
-  accent-color: #6b8af0;
-  width: 10px;
-  height: 10px;
-  margin: 0;
 }
 </style>
