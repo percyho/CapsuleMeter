@@ -5,15 +5,10 @@ import { init, use, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { invoke } from "@tauri-apps/api/core";
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from "vue";
+import type { HistoryPoint } from "../../types/usage";
+import { compactNumber } from "../../utils/formatters";
 
 use([BarChart, LineChart, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
-
-interface HistoryPoint {
-  t: number;
-  p?: number | null;
-  fiveHour?: number | null;
-  weekly?: number | null;
-}
 
 interface DailyUsage {
   date?: string;
@@ -85,21 +80,6 @@ const tokenStats = computed(() => {
     activeDays: values.filter((value) => value > 0).length,
   };
 });
-
-function compactNumber(value: number): string {
-  const units = [
-    { threshold: 1_000_000_000, suffix: "B" },
-    { threshold: 1_000_000, suffix: "M" },
-    { threshold: 1_000, suffix: "k" },
-  ];
-  for (const unit of units) {
-    if (value >= unit.threshold) {
-      const scaled = value / unit.threshold;
-      return `${scaled.toFixed(scaled < 100 && !Number.isInteger(scaled) ? 1 : 0)}${unit.suffix}`;
-    }
-  }
-  return String(Math.round(value));
-}
 
 function scheduleRender(delay = 120) {
   if (renderTimer) clearTimeout(renderTimer);

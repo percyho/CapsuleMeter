@@ -8,6 +8,9 @@ import {
   isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
 import StatsPanel from "./components/statistics/StatsPanel.vue";
+import { useUiTheme } from "./composables/useUiTheme";
+import { useUsageHistory } from "./composables/useUsageHistory";
+import type { UsageData, WindowData } from "./types/usage";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
@@ -50,29 +53,8 @@ function onCapsuleMouseDown(e: MouseEvent) {
   window.addEventListener("mouseup", onDragUp);
 }
 
-interface WindowData {
-  remaining_percent: number | null;
-  used_percent: number | null;
-  reset_at: number | null;
-  reset_after_seconds: number | null;
-}
-
-interface UsageData {
-  plan: string | null;
-  five_hour: WindowData;
-  weekly: WindowData;
-  error: string | null;
-}
-
-interface HistoryPoint {
-  t: number;
-  p?: number | null;
-  fiveHour?: number | null;
-  weekly?: number | null;
-}
-
 const usage = ref<UsageData | null>(null);
-const loading = ref(true);
+const loading = ref(false);
 const lastError = ref<string | null>(null);
 const lastRefresh = ref("--");
 
@@ -85,22 +67,12 @@ let rightTimer: number | undefined;
 // —— 可配置项（localStorage 持久化）——
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
-type UiTheme = "dark" | "light";
-const uiTheme = ref<UiTheme>(localStorage.getItem("uiTheme") === "light" ? "light" : "dark");
+const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
 const activeTab = ref("appearance");
-const historyPoints = ref<HistoryPoint[]>(JSON.parse(localStorage.getItem("usageHistory") || "[]"));
+const { historyPoints, appendUsage } = useUsageHistory({ syncAcrossWindows: true });
 function recordHistory() {
-  if (!usage.value) return;
-  const now = Date.now();
-  historyPoints.value.push({
-    t: now,
-    fiveHour: usage.value.five_hour?.remaining_percent,
-    weekly: usage.value.weekly?.remaining_percent,
-  });
-  // 为统计页的月视图保留最近 30 天，同时兼容旧版 p 字段。
-  const cutoff = now - 30 * 86400000;
-  historyPoints.value = historyPoints.value.filter(h => h.t > cutoff);
-  localStorage.setItem("usageHistory", JSON.stringify(historyPoints.value));
+  if (!usage.value || usage.value.error) return;
+  appendUsage(usage.value);
 }
 async function onQuit() {
   await getCurrentWindow().close();
@@ -228,6 +200,8 @@ const rightFillWidth = computed(() => {
 
 // —— 数据刷新 ——
 async function refresh() {
+  if (loading.value) return;
+  loading.value = true;
   try {
     const data = await invoke<UsageData>("fetch_usage");
     usage.value = data;
@@ -247,19 +221,16 @@ function restartInterval() {
   if (interval) window.clearInterval(interval);
   interval = window.setInterval(refresh, refreshMin.value * 60 * 1000);
 }
-watch(refreshMin, restartInterval);
+watch(refreshMin, (value) => {
+  localStorage.setItem("refreshMin", String(value));
+  restartInterval();
+});
 
 // —— 外观 ——
 function applyWindowSettings() {
   document.body.style.opacity = String(opacity.value);
   document.documentElement.style.setProperty("--num-size", fontSize.value + "px");
-  document.documentElement.dataset.uiTheme = uiTheme.value;
-}
-
-function setUiTheme(theme: UiTheme) {
-  uiTheme.value = theme;
-  localStorage.setItem("uiTheme", theme);
-  applyWindowSettings();
+  applyTheme();
 }
 
 function onOpacityChange() {
@@ -524,7 +495,7 @@ onBeforeUnmount(() => {
       <div class="group-label">数据</div>
       <div class="row">
         <span class="row-name">自动刷新</span>
-        <select v-model.number="refreshMin" @change="restartInterval()">
+        <select v-model.number="refreshMin">
           <option :value="1">1 分钟</option>
           <option :value="2">2 分钟</option>
           <option :value="5">5 分钟</option>
@@ -535,7 +506,7 @@ onBeforeUnmount(() => {
       <div class="row">
         <span class="row-name">上次刷新</span>
         <span class="row-val">{{ lastRefresh }}</span>
-        <button class="btn-mini" @click="refresh()">立即刷新</button>
+        <button class="btn-mini" :disabled="loading" @click="refresh()">{{ loading ? "刷新中…" : "立即刷新" }}</button>
       </div>
 
       </template>
@@ -612,12 +583,73 @@ body {
   width: 100px;
   height: 30px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, rgba(233,236,241,0.72), rgba(199,204,214,0.72));
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background:
+    linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.14) 48%, transparent 74%) 180% 0 / 220% 100%,
+    linear-gradient(180deg, rgba(55, 61, 74, 0.96), rgba(28, 32, 41, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 4px rgba(0,0,0,0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(14px) saturate(135%);
   overflow: hidden;
   cursor: default;
+  transform-origin: center;
+  transition: transform 0.14s ease, border-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.capsule:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 4px 13px rgba(0, 0, 0, 0.36),
+    0 0 10px rgba(75, 151, 235, 0.14);
+  filter: brightness(1.07) saturate(1.06);
+  animation: capsule-shimmer 1.35s ease-out both;
+}
+
+.capsule:active {
+  background:
+    linear-gradient(rgba(96, 110, 137, 0.22), rgba(96, 110, 137, 0.22)),
+    linear-gradient(180deg, rgba(45, 51, 64, 0.98), rgba(22, 26, 34, 0.98));
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.26);
+  filter: brightness(0.96);
+  transform: scale(0.975);
+  animation: none;
+}
+
+@keyframes capsule-shimmer {
+  from { background-position: 180% 0, 0 0; }
+  to { background-position: -80% 0, 0 0; }
+}
+
+.capsule::before {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  inset: 1px 8px auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  pointer-events: none;
+}
+
+.capsule::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 .half {
@@ -628,6 +660,7 @@ body {
   justify-content: center;
   min-width: 0;
   overflow: hidden;
+  transition: background-color 0.18s ease;
 }
 
 /* 填充层：按当前显示模式从中间分隔线向外填充 */
@@ -637,34 +670,52 @@ body {
   top: 0;
   bottom: 0;
   width: 0%;
-  background: rgba(255,255,255,0.85);
-  transition: width 0.4s ease;
+  background: linear-gradient(90deg, rgba(42, 122, 219, 0.92), rgba(90, 173, 255, 0.95));
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.15);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .fill--red {
   left: 0;
   right: auto;
-  background: rgba(238,96,100,0.82);
+  background: linear-gradient(90deg, rgba(255, 124, 112, 0.94), rgba(224, 73, 87, 0.94));
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.13);
 }
 
 .half:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.1);
 }
+
+.half:active { background: rgba(255, 255, 255, 0.16); }
 
 .num {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   font-size: var(--num-size, 13px);
-  font-weight: 700;
-  color: #2b2f3a;
-  letter-spacing: 0;
-  transition: opacity 0.15s ease;
+  font-weight: 750;
+  color: #f8fafc;
+  letter-spacing: -0.2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.18s ease, opacity 0.15s ease;
+}
+
+.half:hover .num { transform: translateY(-0.5px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .capsule,
+  .fill,
+  .half,
+  .num {
+    animation: none;
+    transition-duration: 0.01ms;
+  }
 }
 
 .num.dim {
   font-size: calc(var(--num-size, 13px) * 0.78);
   font-weight: 600;
-  color: #5a6172;
+  color: rgba(248, 250, 252, 0.92);
   opacity: 1;
   white-space: nowrap;
   padding: 0 3px;
