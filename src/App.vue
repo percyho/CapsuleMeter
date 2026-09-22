@@ -7,6 +7,7 @@ import {
   disable as autostartDisable,
   isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
+import StatsPanel from "./components/statistics/StatsPanel.vue";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
@@ -63,6 +64,13 @@ interface UsageData {
   error: string | null;
 }
 
+interface HistoryPoint {
+  t: number;
+  p?: number | null;
+  fiveHour?: number | null;
+  weekly?: number | null;
+}
+
 const usage = ref<UsageData | null>(null);
 const loading = ref(true);
 const lastError = ref<string | null>(null);
@@ -78,44 +86,23 @@ let rightTimer: number | undefined;
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
 const theme = ref(localStorage.getItem("theme") ?? "neon");
-const panelTheme = ref(localStorage.getItem("panelTheme") ?? "dark");
 const activeTab = ref("appearance");
-const analyticsTotal = ref("");
-const linePath = computed(() => {
-  if (historyPoints.value.length < 2) return "";
-  const pts = historyPoints.value.map(h => ({ x: h.t, y: h.p ?? 0 }));
-  const minT = pts[0].x, maxT = pts[pts.length-1].x;
-  const rangeT = maxT - minT || 1;
-  return pts.map((p, i) => {
-    const x = ((p.x - minT) / rangeT) * 280;
-    const y = 100 - (p.y / 100) * 100;
-    return (i === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1);
-  }).join(" ");
-});
-
-const historyPoints = ref(JSON.parse(localStorage.getItem("usageHistory") || "[]"));
+const historyPoints = ref<HistoryPoint[]>(JSON.parse(localStorage.getItem("usageHistory") || "[]"));
 function recordHistory() {
   if (!usage.value) return;
   const now = Date.now();
-  historyPoints.value.push({ t: now, p: usage.value.five_hour?.remaining_percent });
-  // 只保留最近 7 天
-  const cutoff = now - 7 * 86400000;
+  historyPoints.value.push({
+    t: now,
+    fiveHour: usage.value.five_hour?.remaining_percent,
+    weekly: usage.value.weekly?.remaining_percent,
+  });
+  // 为统计页的月视图保留最近 30 天，同时兼容旧版 p 字段。
+  const cutoff = now - 30 * 86400000;
   historyPoints.value = historyPoints.value.filter(h => h.t > cutoff);
   localStorage.setItem("usageHistory", JSON.stringify(historyPoints.value));
 }
-const analyticsPeak = ref("");
-async function loadAnalytics() {
-  try {
-    const a = await invoke("fetch_analytics", { days: 30 });
-    if (a.error) return;
-    analyticsTotal.value = a.total_tokens ? (a.total_tokens / 1e6).toFixed(0) : "";
-    analyticsPeak.value = a.peak_tokens ? (a.peak_tokens / 1e6).toFixed(0) : "";
-  } catch {}
-}
-
 async function onQuit() {
-  const { exit } = await import("@tauri-apps/plugin-process");
-  exit(0);
+  await getCurrentWindow().close();
 }
 
 
@@ -350,8 +337,12 @@ async function onAutostartChange() {
 
 // —— 面板 ——
 const showPanel = ref(false);
-const panelW = ref(Math.min(300, Math.max(120, Number(localStorage.getItem("panelW") ?? "300"))));
-const panelH = ref(Math.min(400, Math.max(80, Number(localStorage.getItem("panelH") ?? "195"))));
+const PANEL_DEFAULT_WIDTH = 360;
+const PANEL_DEFAULT_HEIGHT = 380;
+const PANEL_MIN_WIDTH = 320;
+const PANEL_MIN_HEIGHT = 280;
+const panelW = ref(Math.min(600, Math.max(PANEL_MIN_WIDTH, Number(localStorage.getItem("panelW") ?? PANEL_DEFAULT_WIDTH))));
+const panelH = ref(Math.min(800, Math.max(PANEL_MIN_HEIGHT, Number(localStorage.getItem("panelH") ?? PANEL_DEFAULT_HEIGHT))));
 let panelResize: { sx: number; sy: number; w: number; h: number } | null = null;
 
 function onPanelResizeStart(e: MouseEvent) {
@@ -365,8 +356,8 @@ function onPanelResizeMove(e: MouseEvent) {
   if (!panelResize) return;
   const dx = e.clientX - panelResize.sx;
   const dy = e.clientY - panelResize.sy;
-  panelW.value = Math.max(120, Math.min(300, panelResize.w + dx));
-  panelH.value = Math.max(80, Math.min(400, panelResize.h + dy));
+  panelW.value = Math.max(PANEL_MIN_WIDTH, Math.min(600, panelResize.w + dx));
+  panelH.value = Math.max(PANEL_MIN_HEIGHT, Math.min(800, panelResize.h + dy));
   getCurrentWindow().setSize(new LogicalSize(panelW.value, 30 + panelH.value));
 }
 function onPanelResizeEnd() {
@@ -420,8 +411,8 @@ function resetDefaults() {
   displayMode.value = "remaining";
   refreshMin.value = 5;
   resetShowSec.value = 5;
-  panelW.value = 300;
-  panelH.value = 195;
+  panelW.value = PANEL_DEFAULT_WIDTH;
+  panelH.value = PANEL_DEFAULT_HEIGHT;
   ["opacity", "fontSize", "theme", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "panelW", "panelH"].forEach((k) =>
     localStorage.removeItem(k)
   );
@@ -433,7 +424,7 @@ function resetDefaults() {
     autostart.value = false;
     onAutostartChange();
   }
-  getCurrentWindow().setSize(new LogicalSize(300, 225));
+  getCurrentWindow().setSize(new LogicalSize(PANEL_DEFAULT_WIDTH, 30 + PANEL_DEFAULT_HEIGHT));
 }
 
 onMounted(() => {
@@ -466,17 +457,19 @@ onBeforeUnmount(() => {
 
   <div v-if="showPanel" class="panel" :class='[theme, { "align-right": panelAlignRight }]' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
     <div class="panel-head">
-      <span class="panel-title">设置</span>
+      <div class="panel-heading">
+        <span class="panel-title">设置</span>
+        <span class="panel-description">个性化用量胶囊</span>
+      </div>
       <span class="panel-sub">{{ lastError ? "数据异常" : (usage?.plan || "未登录").toUpperCase() }}</span>
-      <button class="panel-close" title="关闭" @click="togglePanel()">×</button>
+      <button class="panel-close" title="关闭" aria-label="关闭设置" @click="togglePanel()">×</button>
     </div>
 
-
-    <div class="tabs">
-      <button class="tab" :class="{ on: activeTab==='appearance' }" @click="activeTab='appearance'" title="外观"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10h-10V2z"/><path d="M12 12l9.3-9.3"/><path d="M12 12l-6 6"/></svg></button>
-      <button class="tab" :class="{ on: activeTab==='behavior' }" @click="activeTab='behavior'" title="行为"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
-      <button class="tab" :class="{ on: activeTab==='stats' }" @click="activeTab='stats'; loadAnalytics()" title="统计"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></button>
-      <button class="tab" :class="{ on: activeTab==='system' }" @click="activeTab='system'" title="系统"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button>
+    <div class="tabs" role="tablist" aria-label="设置分类">
+      <button class="tab" :class="{ on: activeTab==='appearance' }" role="tab" :aria-selected="activeTab==='appearance'" @click="activeTab='appearance'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10h-10V2z"/><path d="M12 12l9.3-9.3"/><path d="M12 12l-6 6"/></svg><span>外观</span></button>
+      <button class="tab" :class="{ on: activeTab==='behavior' }" role="tab" :aria-selected="activeTab==='behavior'" @click="activeTab='behavior'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>行为</span></button>
+      <button class="tab" :class="{ on: activeTab==='stats' }" role="tab" :aria-selected="activeTab==='stats'" @click="activeTab='stats'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span>统计</span></button>
+      <button class="tab" :class="{ on: activeTab==='system' }" role="tab" :aria-selected="activeTab==='system'" @click="activeTab='system'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>系统</span></button>
     </div>
 
     <div class="panel-body">
@@ -553,17 +546,7 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-if="activeTab==='stats'">
-      <div class="group-label">用量历史（本地记录）</div>
-      <div v-if="historyPoints.length < 2" class="chart-hint">数据积累中，至少需要 2 个采样点</div>
-      <svg v-else class="chart" viewBox="0 0 280 100" preserveAspectRatio="none">
-        <line x1="0" y1="25" x2="280" y2="25" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-        <line x1="0" y1="50" x2="280" y2="50" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-        <line x1="0" y1="75" x2="280" y2="75" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-        <path :d="linePath" fill="none" stroke="var(--accent, #7c5cff)" stroke-width="1.5"/>
-      </svg>
-      <div class="chart-axis"><span>0%</span><span>50%</span><span>100%</span></div>
-      <div class="row"><span class="row-name">采样点数</span><span class="row-val">{{ historyPoints.length }}</span></div>
-
+        <StatsPanel :history-points="historyPoints" @open-history="invoke('open_history')" />
       </template>
 
       <template v-if="activeTab==='system'">
@@ -581,10 +564,11 @@ onBeforeUnmount(() => {
       <div class="row"><span class="row-name">许可证</span><span class="row-val">MIT</span></div>
       </template>
 
-      <div class="panel-foot">
-        <button class="btn-mini" @click="resetDefaults()">恢复默认</button>
-        <button class="btn-mini" @click="onQuit()">退出应用</button>
-      </div>
+    </div>
+
+    <div class="panel-foot">
+      <button class="btn-mini btn-secondary" @click="resetDefaults()">恢复默认</button>
+      <button class="btn-mini btn-danger" @click="onQuit()">退出应用</button>
     </div>
 
     <div class="resize-handle" @mousedown="onPanelResizeStart"></div>
@@ -688,32 +672,46 @@ body {
   flex-direction: column;
   background: var(--panel-bg, rgba(24, 27, 35, 0.97));
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
-  border-radius: 8px;
-  margin-top: 4px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+  margin-top: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
   overflow: hidden;
 }
 
 .panel-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 12px 9px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
+.panel-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .panel-title {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  color: #e8eaf0;
-  letter-spacing: 1px;
+  color: var(--panel-title, #f4f6fb);
+  letter-spacing: 0.2px;
+}
+
+.panel-description {
+  color: var(--panel-val, #7f8799);
+  font-size: 9px;
+  white-space: nowrap;
 }
 
 .panel-sub {
   flex: 1;
   font-size: 9px;
-  color: #6b8af0;
+  color: var(--panel-accent, #7d98f5);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -721,14 +719,14 @@ body {
 }
 
 .panel-close {
-  width: 16px;
-  height: 16px;
-  line-height: 14px;
+  width: 26px;
+  height: 26px;
+  line-height: 24px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: #9aa1b5;
-  font-size: 13px;
+  font-size: 17px;
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
@@ -741,35 +739,48 @@ body {
 
 .tabs {
   display: flex;
-  gap: 2px;
-  padding: 8px 12px 0;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   flex-shrink: 0;
 }
 
 .tab {
   flex: 1;
-  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px 5px;
   border: none;
   background: transparent;
   color: var(--panel-val, #7f8799);
-  font-size: 13px;
+  font-size: 10px;
   cursor: pointer;
-  border-radius: 6px 6px 0 0;
+  border-radius: 7px;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
+.tab svg { flex-shrink: 0; }
+
+.tab:hover { background: rgba(255, 255, 255, 0.05); }
+
 .tab.on {
-  background: var(--panel-bg-active, rgba(255,255,255,0.08));
+  background: var(--panel-bg-active, rgba(107, 138, 240, 0.15));
   color: var(--panel-text, #fff);
   font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(107, 138, 240, 0.2);
 }
 
 .panel-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 2px 8px 8px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 6px;
 }
 
 .panel-body::-webkit-scrollbar {
@@ -783,11 +794,12 @@ body {
 
 .group-label {
   font-size: 9px;
-  color: #6b8af0;
-  letter-spacing: 2px;
-  margin-top: 5px;
-  padding: 2px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-weight: 700;
+  color: var(--panel-accent, #7d98f5);
+  letter-spacing: 1.2px;
+  margin-top: 7px;
+  padding: 7px 2px 2px;
+  text-transform: uppercase;
 }
 
 .group-label:first-child {
@@ -798,20 +810,26 @@ body {
 .row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 24px;
-  font-size: 10px;
+  gap: 10px;
+  min-height: 38px;
+  padding: 7px 9px;
+  font-size: 11px;
   color: #d8dce6;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 8px;
 }
 
 .row-name {
-  flex: 0 0 66px;
-  color: #aab2c5;
+  flex: 0 0 88px;
+  color: var(--panel-text, #cfd4df);
+  line-height: 1.35;
 }
 
 .row-val {
-  font-size: 9px;
-  color: #7f8799;
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--panel-val, #8f97a8);
   min-width: 30px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -819,7 +837,7 @@ body {
 
 .row input[type="range"] {
   flex: 1;
-  height: 3px;
+  height: 4px;
   accent-color: #6b8af0;
   min-width: 0;
 }
@@ -833,8 +851,8 @@ body {
 }
 
 .theme-dot {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
   cursor: pointer;
@@ -854,9 +872,10 @@ body {
 
 /* 开关 */
 .switch {
-  width: 30px;
-  height: 16px;
-  border-radius: 8px;
+  width: 34px;
+  height: 20px;
+  margin-left: auto;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.18);
   position: relative;
@@ -870,8 +889,8 @@ body {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
   transition: left 0.15s ease;
@@ -893,14 +912,15 @@ body {
   border-radius: 5px;
   overflow: hidden;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .seg button {
   background: transparent;
   border: none;
   color: #9aa1b5;
-  font-size: 9px;
-  padding: 2px 9px;
+  font-size: 10px;
+  padding: 4px 12px;
   cursor: pointer;
   line-height: 12px;
 }
@@ -916,8 +936,10 @@ body {
   color: #d8dce6;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
-  font-size: 9px;
-  padding: 2px 4px;
+  min-width: 88px;
+  margin-left: auto;
+  font-size: 10px;
+  padding: 5px 8px;
   outline: none;
   flex-shrink: 0;
 }
@@ -932,9 +954,9 @@ body {
   background: rgba(107, 138, 240, 0.16);
   color: #8fa7f5;
   border: 1px solid rgba(107, 138, 240, 0.35);
-  border-radius: 4px;
-  font-size: 9px;
-  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  padding: 6px 10px;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -957,8 +979,34 @@ body {
   font-size: 12px;
 }
 
-.privacy-row { flex-direction: column; align-items: flex-start; gap: 4px; }
-.privacy-text { font-size: 12px; color: var(--panel-val, #888); line-height: 1.5; margin: 0; }
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 4px 0;
+}
+.open-detail-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px 0 4px;
+}
+.kpi {
+  background: rgba(107, 138, 240, 0.1);
+  border: 1px solid rgba(107, 138, 240, 0.25);
+  border-radius: 8px; padding: 9px 6px; text-align: center;
+}
+.kpi-val { font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.kpi-lbl { font-size: 7px;
+  color: var(--panel-val, #888);
+  margin-top: 2px;
+}
+
+.privacy-text { margin-left: auto; font-size: 10px; color: var(--panel-val, #888); line-height: 1.5; }
 
 .chart-axis {
   display: flex;
@@ -969,11 +1017,31 @@ body {
 }
 
 .panel-foot {
-  padding: 8px 12px;
+  padding: 9px 12px 11px;
   gap: 8px;
   display: flex;
-  justify-content: center;
-  padding-top: 4px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.btn-secondary { margin-right: auto; }
+
+.btn-danger {
+  color: #ef9a9a;
+  border-color: rgba(239, 100, 100, 0.28);
+  background: rgba(239, 100, 100, 0.08);
+}
+
+.btn-danger:hover { background: rgba(239, 100, 100, 0.18); }
+
+.tab:focus-visible,
+.panel button:focus-visible,
+.panel select:focus-visible,
+.panel input:focus-visible {
+  outline: 2px solid var(--panel-accent, #6b8af0);
+  outline-offset: 2px;
 }
 
 .panel.light {
@@ -1000,9 +1068,7 @@ body {
   position: absolute;
   right: 2px;
   bottom: 2px;
-  width: 12px;
-  height: 12px;
-  cursor: nwse-resize;
+  width: 20px; height: 20px; cursor: se-resize;
   background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.25) 50%);
 }
 </style>

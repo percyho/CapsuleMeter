@@ -27,6 +27,22 @@
         "skipTaskbar": true,
         "shadow": false,
         "center": true
+      },
+      {
+        "label": "history",
+        "title": "用量历史",
+        "width": 920,
+        "height": 600,
+        "minWidth": 640,
+        "minHeight": 420,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "url": "history.html",
+        "visible": false,
+        "center": true
       }
     ],
     "security": {

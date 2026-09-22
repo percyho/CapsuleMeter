@@ -6,6 +6,14 @@ const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        history: "history.html",
+      },
+    },
+  },
   clearScreen: false,
   server: {
     port: 1420,
