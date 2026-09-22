@@ -4,6 +4,7 @@ import { GraphicComponent, GridComponent, TooltipComponent } from "echarts/compo
 import { init, use, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from "vue";
 
 use([BarChart, LineChart, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
@@ -15,6 +16,15 @@ type Tab = "quota" | "tokens";
 type QuotaWindow = "fiveHour" | "weekly";
 type QuotaRange = "current" | 7 | 14 | 30;
 type TokenRange = 7 | 30 | 90 | 365 | 3650;
+type UiTheme = "dark" | "light";
+
+function readUiTheme(): UiTheme {
+  return localStorage.getItem("uiTheme") === "light" ? "light" : "dark";
+}
+
+function applyUiTheme(theme = readUiTheme()) {
+  document.documentElement.dataset.uiTheme = theme;
+}
 
 const tab = shallowRef<Tab>("quota");
 const quotaWindow = shallowRef<QuotaWindow>("weekly");
@@ -22,6 +32,7 @@ const quotaRange = shallowRef<QuotaRange>("current");
 const tokenRange = shallowRef<TokenRange>(30);
 const loading = shallowRef(false);
 const error = shallowRef("");
+const actionMessage = shallowRef("");
 const daily = shallowRef<DailyUsage[]>([]);
 const historyPoints = shallowRef<HistoryPoint[]>(readHistory());
 const chartElement = useTemplateRef<HTMLDivElement>("chart");
@@ -125,11 +136,29 @@ function renderChart() {
   }, { notMerge: true });
 }
 function refreshHistory() { historyPoints.value = readHistory(); scheduleRender(0); }
-function exportCsv() {
+function onStorage(event: StorageEvent) {
+  if (event.key !== "uiTheme") return;
+  applyUiTheme();
+  scheduleRender(0);
+}
+async function exportCsv() {
   const rows = [["date", "five_hour_remaining_percent", "weekly_remaining_percent"]];
   for (const point of historyPoints.value) rows.push([new Date(point.t).toISOString(), point.fiveHour == null && point.p == null ? "" : String(point.fiveHour ?? point.p), point.weekly == null ? "" : String(point.weekly)]);
-  const url = URL.createObjectURL(new Blob([`\uFEFF${rows.map(row => row.join(",")).join("\n")}`], { type: "text/csv;charset=utf-8" }));
-  const anchor = document.createElement("a"); anchor.href = url; anchor.download = "codex-usage-history.csv"; anchor.click(); URL.revokeObjectURL(url);
+  actionMessage.value = "";
+  try {
+    const path = await save({
+      defaultPath: "codex-usage-history.csv",
+      filters: [{ name: "CSV 文件", extensions: ["csv"] }],
+    });
+    if (!path) return;
+    await invoke("write_history_csv", {
+      path,
+      contents: `\uFEFF${rows.map(row => row.join(",")).join("\n")}`,
+    });
+    actionMessage.value = `已导出到 ${path}`;
+  } catch (reason) {
+    actionMessage.value = `导出失败：${String(reason)}`;
+  }
 }
 function clearHistory() {
   if (!window.confirm("确定清除所有本地额度历史记录？此操作无法撤销。")) return;
@@ -139,10 +168,12 @@ watch(tab, async () => { await nextTick(); scheduleRender(0); });
 watch([quotaWindow, quotaRange], () => scheduleRender());
 watch(tokenRange, () => void loadTokens());
 onMounted(async () => {
+  applyUiTheme();
+  window.addEventListener("storage", onStorage);
   if (chartElement.value) { chart = init(chartElement.value); resizeObserver = new ResizeObserver(() => chart?.resize()); resizeObserver.observe(chartElement.value); }
   renderChart(); await loadTokens();
 });
-onBeforeUnmount(() => { requestSequence += 1; if (renderTimer) clearTimeout(renderTimer); resizeObserver?.disconnect(); chart?.dispose(); chart = null; });
+onBeforeUnmount(() => { requestSequence += 1; window.removeEventListener("storage", onStorage); if (renderTimer) clearTimeout(renderTimer); resizeObserver?.disconnect(); chart?.dispose(); chart = null; });
 </script>
 
 <template>
@@ -159,6 +190,7 @@ onBeforeUnmount(() => { requestSequence += 1; if (renderTimer) clearTimeout(rend
       </div>
     </header>
     <section class="workspace">
+      <div v-if="actionMessage" class="action-message" role="status">{{ actionMessage }}</div>
       <div class="toolbar">
         <template v-if="tab === 'quota'">
           <label class="field"><span>额度窗口</span><select v-model="quotaWindow"><option value="fiveHour">5 小时</option><option value="weekly">每周</option></select></label>
@@ -195,7 +227,20 @@ onBeforeUnmount(() => { requestSequence += 1; if (renderTimer) clearTimeout(rend
 <style>
 :root { color-scheme: light dark; --accent:#0a84ff; --bg:#f4f5f8; --surface:rgba(255,255,255,.9); --surface-solid:#fff; --surface-hover:rgba(25,35,55,.06); --border:rgba(20,28,42,.1); --text-primary:#1d2433; --text-secondary:#667085; --text-tertiary:#98a2b3; --chart-grid:rgba(20,28,42,.1); }
 @media (prefers-color-scheme: dark) { :root { --bg:#17191f; --surface:rgba(38,41,51,.9); --surface-solid:#292c35; --surface-hover:rgba(255,255,255,.07); --border:rgba(255,255,255,.1); --text-primary:#f4f6fb; --text-secondary:#a9b0bf; --text-tertiary:#737b8b; --chart-grid:rgba(255,255,255,.1); } }
+:root[data-ui-theme="light"] { color-scheme:light; --bg:#f4f5f8; --surface:rgba(255,255,255,.9); --surface-solid:#fff; --surface-hover:rgba(25,35,55,.06); --border:rgba(20,28,42,.1); --text-primary:#1d2433; --text-secondary:#667085; --text-tertiary:#98a2b3; --chart-grid:rgba(20,28,42,.1); }
+:root[data-ui-theme="dark"] { color-scheme:dark; --bg:#17191f; --surface:rgba(38,41,51,.9); --surface-solid:#292c35; --surface-hover:rgba(255,255,255,.07); --border:rgba(255,255,255,.1); --text-primary:#f4f6fb; --text-secondary:#a9b0bf; --text-tertiary:#737b8b; --chart-grid:rgba(255,255,255,.1); }
 * { box-sizing:border-box; } html,body,#app { width:100%; height:100%; margin:0; overflow:hidden; } body { background:var(--bg); } button,select { font:inherit; }
+</style>
+<style scoped>
+.action-message {
+  padding: 8px 10px;
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  border-radius: 9px;
+  background: rgba(10, 132, 255, 0.08);
+  color: var(--text-secondary);
+  font-size: 11px;
+  word-break: break-all;
+}
 </style>
 <style scoped>
 .history-view{display:flex;flex-direction:column;height:100%;color:var(--text-primary);background:radial-gradient(circle at 16% 0%,rgba(10,132,255,.08),transparent 34%),var(--bg);font-family:Inter,system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}.topbar{display:grid;grid-template-columns:minmax(160px,1fr) auto minmax(260px,1fr);align-items:center;gap:18px;padding:16px 20px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:blur(18px)}.title-block{min-width:0}.page-title{margin:0;font-size:18px;line-height:1.2}.page-subtitle{margin:3px 0 0;color:var(--text-secondary);font-size:11px}.tabs,.segmented{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--surface-hover)}.tabs button,.segmented button{border:0;border-radius:7px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:6px 12px;white-space:nowrap;transition:.15s}.tabs button.active,.segmented button.active{color:var(--text-primary);background:var(--surface-solid);box-shadow:0 1px 4px rgba(16,24,40,.1);font-weight:600}.topbar-actions{display:flex;justify-content:flex-end;gap:8px}.ghost,.icon-button{border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-primary);cursor:pointer;font-size:12px;padding:6px 11px}.ghost:hover,.icon-button:hover{background:var(--surface-hover)}.icon-button{width:31px;padding:0;font-size:16px}.danger{color:#ff453a}.workspace{display:flex;flex:1;flex-direction:column;min-height:0;gap:12px;padding:16px 20px 12px}.toolbar{display:flex;align-items:center;gap:12px;min-height:34px}.field{display:flex;align-items:center;gap:8px;color:var(--text-secondary);font-size:12px}.field select{border:1px solid var(--border);border-radius:8px;outline:0;background:var(--surface-solid);color:var(--text-primary);padding:6px 28px 6px 9px}.range-label{margin-left:auto;color:var(--text-tertiary);font-size:11px}.state-badge{color:var(--text-secondary);font-size:11px}.state-badge.warning{color:#ff9500}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric-card{display:flex;flex-direction:column-reverse;gap:4px;min-width:0;padding:13px 15px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:0 4px 14px rgba(16,24,40,.035)}.metric-card span{color:var(--text-secondary);font-size:11px}.metric-card strong{overflow:hidden;color:var(--text-primary);font-size:21px;line-height:1.1;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}.chart-card{display:flex;flex:1;flex-direction:column;min-height:0;padding:14px 16px 10px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:0 8px 28px rgba(16,24,40,.05)}.chart-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.chart-heading h2{margin:0;font-size:14px}.chart-heading p{margin:4px 0 0;color:var(--text-secondary);font-size:11px}.legend{display:flex;align-items:center;gap:6px;color:var(--text-secondary);font-size:11px;white-space:nowrap}.legend i{width:8px;height:8px;border-radius:3px;background:var(--accent)}.chart-main{flex:1;width:100%;min-height:260px}.statusbar{display:flex;align-items:center;justify-content:space-between;padding:9px 20px;border-top:1px solid var(--border);color:var(--text-tertiary);background:color-mix(in srgb,var(--surface) 76%,transparent);font-size:11px}button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}@media(max-width:760px){.topbar{grid-template-columns:1fr auto}.tabs{grid-column:1/-1;grid-row:2;justify-self:stretch}.tabs button{flex:1}.topbar-actions{grid-column:2;grid-row:1}.toolbar{align-items:flex-start;flex-wrap:wrap}.range-label{width:100%;margin-left:0}}@media(max-width:560px){.topbar,.workspace{padding-left:12px;padding-right:12px}.page-subtitle{display:none}.topbar-actions .ghost{padding-inline:8px}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.segmented{max-width:100%;overflow-x:auto}.statusbar{padding-inline:12px}}

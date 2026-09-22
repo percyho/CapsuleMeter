@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { BarChart, LineChart } from "echarts/charts";
-import { GridComponent, TooltipComponent } from "echarts/components";
+import { GraphicComponent, GridComponent, TooltipComponent } from "echarts/components";
 import { init, use, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { invoke } from "@tauri-apps/api/core";
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from "vue";
 
-use([BarChart, LineChart, GridComponent, TooltipComponent, CanvasRenderer]);
+use([BarChart, LineChart, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
 
 interface HistoryPoint {
   t: number;
@@ -32,7 +32,7 @@ type QuotaWindow = "fiveHour" | "weekly";
 type QuotaRange = 1 | 7 | 14 | 30;
 type TokenRange = 7 | 30 | 90 | 365 | 3650;
 
-const props = defineProps<{ historyPoints: HistoryPoint[] }>();
+const props = defineProps<{ historyPoints: HistoryPoint[]; uiTheme: "dark" | "light" }>();
 const emit = defineEmits<{ openHistory: [] }>();
 
 const activeView = shallowRef<ViewTab>("quota");
@@ -211,7 +211,7 @@ function renderChart() {
   }, { notMerge: true });
 }
 
-watch([activeView, quotaWindow, quotaRange, () => props.historyPoints], async () => {
+watch([activeView, quotaWindow, quotaRange, () => props.historyPoints, () => props.uiTheme], async () => {
   await nextTick();
   scheduleRender();
 });

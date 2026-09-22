@@ -85,7 +85,8 @@ let rightTimer: number | undefined;
 // —— 可配置项（localStorage 持久化）——
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
-const theme = ref(localStorage.getItem("theme") ?? "neon");
+type UiTheme = "dark" | "light";
+const uiTheme = ref<UiTheme>(localStorage.getItem("uiTheme") === "light" ? "light" : "dark");
 const activeTab = ref("appearance");
 const historyPoints = ref<HistoryPoint[]>(JSON.parse(localStorage.getItem("usageHistory") || "[]"));
 function recordHistory() {
@@ -112,13 +113,6 @@ const displayMode = ref(localStorage.getItem("displayMode") ?? "remaining"); // 
 const refreshMin = ref(Number(localStorage.getItem("refreshMin") ?? "5"));
 const resetShowSec = ref(Number(localStorage.getItem("resetShowSec") ?? "5"));
 const autostart = ref(false);
-
-const THEMES: Record<string, { bg: string; left: string; right: string; num: string; name: string }> = {
-  light: { bg: "linear-gradient(180deg, rgba(233,236,241,0.72), rgba(199,204,214,0.72))", left: "rgba(255,255,255,0.85)", right: "rgba(238,96,100,0.82)", num: "#2b2f3a", name: "浅灰" },
-  dark: { bg: "linear-gradient(180deg, rgba(50,54,66,0.78), rgba(30,33,42,0.78))", left: "rgba(120,160,255,0.7)", right: "rgba(255,130,130,0.7)", num: "#e8eaf0", name: "深色" },
-  forest: { bg: "linear-gradient(180deg, rgba(220,235,220,0.72), rgba(180,205,185,0.72))", left: "rgba(120,200,140,0.75)", right: "rgba(240,160,90,0.75)", num: "#2d3a30", name: "森林" },
-  sunset: { bg: "linear-gradient(180deg, rgba(245,220,200,0.72), rgba(220,180,170,0.72))", left: "rgba(255,200,120,0.75)", right: "rgba(220,90,120,0.75)", num: "#3a2b2b", name: "晚霞" }
-};
 
 // —— 显示值（支持剩余/已用模式切换）——
 function pickPct(w: WindowData | undefined): number | null {
@@ -150,6 +144,16 @@ function fmtClock(epochSec: number | null): string {
     d.getDate() === now.getDate();
   if (sameDay) return `${hh}:${mm}`;
   return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+/** 5 小时窗口始终显示具体重置时刻，跨天也不退化为日期。 */
+function fmtTimeOnly(epochSec: number | null): string {
+  if (!epochSec) return "--";
+  return new Date(epochSec * 1000).toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 // 左侧点击：显示 5 小时重置时间，N 秒后恢复
@@ -191,7 +195,7 @@ const leftDisplay = computed(() => {
   if (usage.value?.error) return "ERR";
   const w = usage.value?.five_hour;
   if (!w) return "--";
-  if (showLeftReset.value) return fmtClock(w.reset_at);
+  if (showLeftReset.value) return fmtTimeOnly(w.reset_at);
   return leftValue.value;
 });
 
@@ -246,24 +250,16 @@ function restartInterval() {
 watch(refreshMin, restartInterval);
 
 // —— 外观 ——
-function applyTheme() {
-  const t = THEMES[theme.value] || THEMES.neon;
-  const root = document.documentElement.style;
-  root.setProperty("--bg", t.bg);
-  root.setProperty("--left-fill", t.left);
-  root.setProperty("--right-fill", t.right);
-  root.setProperty("--num-color", t.num);
-}
-
-function onThemeChange() {
-  localStorage.setItem("theme", theme.value);
-  applyTheme();
-}
-
 function applyWindowSettings() {
-  applyTheme();
   document.body.style.opacity = String(opacity.value);
   document.documentElement.style.setProperty("--num-size", fontSize.value + "px");
+  document.documentElement.dataset.uiTheme = uiTheme.value;
+}
+
+function setUiTheme(theme: UiTheme) {
+  uiTheme.value = theme;
+  localStorage.setItem("uiTheme", theme);
+  applyWindowSettings();
 }
 
 function onOpacityChange() {
@@ -405,7 +401,7 @@ function onContextMenu(e: MouseEvent) {
 function resetDefaults() {
   opacity.value = 0.72;
   fontSize.value = 13;
-  theme.value = "neon";
+  uiTheme.value = "dark";
   alwaysOnTop.value = true;
   snapEnabled.value = true;
   displayMode.value = "remaining";
@@ -413,7 +409,7 @@ function resetDefaults() {
   resetShowSec.value = 5;
   panelW.value = PANEL_DEFAULT_WIDTH;
   panelH.value = PANEL_DEFAULT_HEIGHT;
-  ["opacity", "fontSize", "theme", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "panelW", "panelH"].forEach((k) =>
+  ["opacity", "fontSize", "uiTheme", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "panelW", "panelH"].forEach((k) =>
     localStorage.removeItem(k)
   );
   applyWindowSettings();
@@ -455,7 +451,7 @@ onBeforeUnmount(() => {
     </div>
   </div>
 
-  <div v-if="showPanel" class="panel" :class='[theme, { "align-right": panelAlignRight }]' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
+  <div v-if="showPanel" class="panel" :class='{ "align-right": panelAlignRight }' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
     <div class="panel-head">
       <div class="panel-heading">
         <span class="panel-title">设置</span>
@@ -475,12 +471,11 @@ onBeforeUnmount(() => {
     <div class="panel-body">
       <template v-if="activeTab==='appearance'">
       <div class="row">
-        <span class="row-name">主题</span>
-        <div class="themes">
-          <button v-for="(_, key) in THEMES" :key="key" class="theme-dot" :class="{ active: theme === key }"
-                  :title="THEMES[key].name" @click="theme = key; onThemeChange()"></button>
+        <span class="row-name">界面主题</span>
+        <div class="seg" aria-label="界面主题">
+          <button :class="{ on: uiTheme === 'light' }" @click="setUiTheme('light')">明亮</button>
+          <button :class="{ on: uiTheme === 'dark' }" @click="setUiTheme('dark')">暗黑</button>
         </div>
-        <span class="row-val">{{ THEMES[theme]?.name || "" }}</span>
       </div>
       <div class="row">
         <span class="row-name">透明度</span>
@@ -546,12 +541,12 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-if="activeTab==='stats'">
-        <StatsPanel :history-points="historyPoints" @open-history="invoke('open_history')" />
+        <StatsPanel :history-points="historyPoints" :ui-theme="uiTheme" @open-history="invoke('open_history')" />
       </template>
 
       <template v-if="activeTab==='system'">
       <div class="group-label">系统</div>
-      <div class="row">
+      <div class="row row-flat">
         <span class="row-name">开机自启</span>
         <button class="switch" :class="{ on: autostart }" @click="autostart = !autostart; onAutostartChange()">
           <span class="knob"></span>
@@ -559,9 +554,22 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="group-label">关于</div>
-      <div class="row"><span class="row-name">版本</span><span class="row-val">v1.0.0</span></div>
-      <div class="row privacy-row"><span class="row-name">隐私</span><p class="privacy-text">本地运行，不上传数据</p></div>
-      <div class="row"><span class="row-name">许可证</span><span class="row-val">MIT</span></div>
+      <div class="row row-flat"><span class="row-name">版本</span><span class="row-val">v1.0.0</span></div>
+      <div class="row row-flat privacy-row">
+        <div class="privacy-heading">
+          <span class="row-name">隐私</span>
+          <span class="privacy-badge">仅本地处理</span>
+        </div>
+        <p class="privacy-summary">Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。</p>
+        <ul class="privacy-list">
+          <li><strong>认证信息</strong><span>仅在本机读取 Codex 登录凭据；访问令牌不会显示在界面或写入历史记录。</span></li>
+          <li><strong>网络请求</strong><span>仅用于向 ChatGPT 官方接口获取额度与用量统计，不会发送给第三方服务。</span></li>
+          <li><strong>本地数据</strong><span>偏好设置和额度采样保存在本机，可通过“恢复默认”或“清除历史”删除。</span></li>
+          <li><strong>CSV 导出</strong><span>只有你主动选择保存位置时才会生成文件，应用不会自动上传导出内容。</span></li>
+          <li><strong>遥测</strong><span>应用不包含广告、用户追踪或后台遥测。</span></li>
+        </ul>
+      </div>
+      <div class="row row-flat"><span class="row-name">许可证</span><span class="row-val">MIT</span></div>
       </template>
 
     </div>
@@ -604,7 +612,7 @@ body {
   width: 100px;
   height: 30px;
   flex-shrink: 0;
-  background: var(--bg);
+  background: linear-gradient(180deg, rgba(233,236,241,0.72), rgba(199,204,214,0.72));
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 4px rgba(0,0,0,0.18);
@@ -629,14 +637,14 @@ body {
   top: 0;
   bottom: 0;
   width: 0%;
-  background: var(--left-fill);
+  background: rgba(255,255,255,0.85);
   transition: width 0.4s ease;
 }
 
 .fill--red {
   left: 0;
   right: auto;
-  background: var(--right-fill);
+  background: rgba(238,96,100,0.82);
 }
 
 .half:hover {
@@ -648,7 +656,7 @@ body {
   z-index: 1;
   font-size: var(--num-size, 13px);
   font-weight: 700;
-  color: var(--num-color);
+  color: #2b2f3a;
   letter-spacing: 0;
   transition: opacity 0.15s ease;
 }
@@ -820,6 +828,12 @@ body {
   border-radius: 8px;
 }
 
+.row.row-flat {
+  padding-inline: 2px;
+  background: transparent;
+  border-color: transparent;
+}
+
 .row-name {
   flex: 0 0 88px;
   color: var(--panel-text, #cfd4df);
@@ -841,34 +855,6 @@ body {
   accent-color: #6b8af0;
   min-width: 0;
 }
-
-/* 主题色板 */
-.themes {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex: 1;
-}
-
-.theme-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.theme-dot.active {
-  outline: 2px solid #6b8af0;
-  outline-offset: 1px;
-}
-
-.theme-dot:nth-child(1) { background: #c8ccd4; }
-.theme-dot:nth-child(2) { background: #2a2e3a; }
-.theme-dot:nth-child(3) { background: #78c88c; }
-.theme-dot:nth-child(4) { background: #f0a878; }
 
 /* 开关 */
 .switch {
@@ -1006,7 +992,53 @@ body {
   margin-top: 2px;
 }
 
-.privacy-text { margin-left: auto; font-size: 10px; color: var(--panel-val, #888); line-height: 1.5; }
+.privacy-row {
+  display: block;
+  min-height: 0;
+  padding-block: 8px;
+}
+
+.privacy-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.privacy-badge {
+  color: #72c894;
+  font-size: 8px;
+  letter-spacing: 0.4px;
+}
+
+.privacy-summary {
+  margin: 7px 0 8px;
+  color: var(--panel-text, #cfd4df);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.privacy-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.privacy-list li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--panel-val, #888);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.privacy-list strong {
+  color: var(--panel-text, #cfd4df);
+  font-weight: 600;
+}
 
 .chart-axis {
   display: flex;
@@ -1044,16 +1076,6 @@ body {
   outline-offset: 2px;
 }
 
-.panel.light {
-  --panel-bg: rgba(245, 247, 250, 0.97);
-  --panel-border: rgba(0, 0, 0, 0.1);
-  --panel-title: #1a1d26;
-  --panel-text: #2b2f3a;
-  --panel-sub: #5a6172;
-  --panel-val: #8a90a0;
-  --panel-accent: #4a6ee0;
-}
-
 .capsule-right {
   position: absolute;
   right: 0;
@@ -1071,4 +1093,43 @@ body {
   width: 20px; height: 20px; cursor: se-resize;
   background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.25) 50%);
 }
+
+html[data-ui-theme="light"] .panel {
+  --panel-bg: rgba(248, 249, 252, 0.98);
+  --panel-border: rgba(20, 28, 42, 0.12);
+  --panel-title: #1d2433;
+  --panel-text: #344054;
+  --panel-val: #667085;
+  --panel-accent: #2563eb;
+  --panel-bg-active: rgba(37, 99, 235, 0.1);
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+html[data-ui-theme="light"] .panel-head,
+html[data-ui-theme="light"] .tabs,
+html[data-ui-theme="light"] .panel-foot {
+  border-color: rgba(20, 28, 42, 0.09);
+}
+
+html[data-ui-theme="light"] .row {
+  color: #344054;
+  background: rgba(20, 28, 42, 0.035);
+  border-color: rgba(20, 28, 42, 0.07);
+}
+
+html[data-ui-theme="light"] .row.row-flat { background: transparent; border-color: transparent; }
+html[data-ui-theme="light"] .tab:hover { background: rgba(20, 28, 42, 0.05); }
+html[data-ui-theme="light"] .panel-close { color: #667085; }
+html[data-ui-theme="light"] .panel-close:hover { background: rgba(20, 28, 42, 0.08); color: #1d2433; }
+html[data-ui-theme="light"] .switch { background: rgba(20, 28, 42, 0.12); border-color: rgba(20, 28, 42, 0.16); }
+html[data-ui-theme="light"] .switch.on { background: #2563eb; border-color: #2563eb; }
+html[data-ui-theme="light"] .seg { border-color: rgba(20, 28, 42, 0.18); }
+html[data-ui-theme="light"] .seg button { color: #667085; }
+html[data-ui-theme="light"] .seg button.on { background: #2563eb; color: #fff; }
+html[data-ui-theme="light"] .panel select { background: #fff; color: #344054; border-color: rgba(20, 28, 42, 0.16); }
+html[data-ui-theme="light"] .panel select option { background: #fff; color: #344054; }
+html[data-ui-theme="light"] .panel-foot { background: rgba(20, 28, 42, 0.025); }
+html[data-ui-theme="light"] .kpi-val { color: #1d2433; }
+html[data-ui-theme="light"] .panel-body::-webkit-scrollbar-thumb { background: rgba(20, 28, 42, 0.18); }
+html[data-ui-theme="light"] .resize-handle { background: linear-gradient(135deg, transparent 50%, rgba(20, 28, 42, 0.2) 50%); }
 </style>

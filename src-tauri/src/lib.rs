@@ -17,10 +17,16 @@ fn open_history(app: tauri::AppHandle) {
         .build();
 }
 
+#[tauri::command]
+fn write_history_csv(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(path, contents).map_err(|error| format!("写入 CSV 失败：{error}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -34,7 +40,8 @@ pub fn run() {
             usage::fetch_usage,
             usage::fetch_analytics,
             window_pos::set_snap_enabled,
-            open_history
+            open_history,
+            write_history_csv
         ])
         .setup(|app| {
             window_pos::restore(app.handle());
