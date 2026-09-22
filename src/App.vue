@@ -823,8 +823,8 @@ body {
   padding: 7px 9px;
   font-size: 11px;
   color: #d8dce6;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 8px;
 }
 
@@ -1111,11 +1111,7 @@ html[data-ui-theme="light"] .panel-foot {
   border-color: rgba(20, 28, 42, 0.09);
 }
 
-html[data-ui-theme="light"] .row {
-  color: #344054;
-  background: rgba(20, 28, 42, 0.035);
-  border-color: rgba(20, 28, 42, 0.07);
-}
+html[data-ui-theme="light"] .row { color: #344054; background: transparent; border-color: transparent; }
 
 html[data-ui-theme="light"] .row.row-flat { background: transparent; border-color: transparent; }
 html[data-ui-theme="light"] .tab:hover { background: rgba(20, 28, 42, 0.05); }

@@ -14,6 +14,7 @@ fn open_history(app: tauri::AppHandle) {
         .title("使用历史")
         .inner_size(920.0, 600.0)
         .resizable(true)
+        .decorations(false)
         .build();
 }
 
