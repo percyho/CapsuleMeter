@@ -125,7 +125,10 @@ fn system_proxy_url() -> Option<String> {
     let addr = if server.contains('=') {
         server
             .split(';')
-            .find_map(|kv| kv.strip_prefix("https=").or_else(|| kv.strip_prefix("http=")))
+            .find_map(|kv| {
+                kv.strip_prefix("https=")
+                    .or_else(|| kv.strip_prefix("http="))
+            })
             .unwrap_or("")
             .to_string()
     } else {
@@ -280,34 +283,97 @@ pub struct AnalyticsData {
 pub async fn fetch_analytics(days: u32) -> Result<AnalyticsData, String> {
     let (access, account) = match load_auth() {
         Ok(v) => v,
-        Err(e) => return Ok(AnalyticsData { daily: vec![], total_tokens: None, peak_tokens: None, error: Some(e) }),
+        Err(e) => {
+            return Ok(AnalyticsData {
+                daily: vec![],
+                total_tokens: None,
+                peak_tokens: None,
+                error: Some(e),
+            })
+        }
     };
     let client = build_http_client()?;
-    let url = format!("https://chatgpt.com/backend-api/wham/analytics/daily-workspace-usage-counts?days={days}");
+    let url = format!(
+        "https://chatgpt.com/backend-api/wham/analytics/daily-workspace-usage-counts?days={days}"
+    );
     let mut req = client.get(&url).bearer_auth(&access);
-    if !account.is_empty() { req = req.header("ChatGPT-Account-Id", &account); }
+    if !account.is_empty() {
+        req = req.header("ChatGPT-Account-Id", &account);
+    }
     let resp = match req.send().await {
         Ok(r) => r,
-        Err(e) => return Ok(AnalyticsData { daily: vec![], total_tokens: None, peak_tokens: None, error: Some(format!("请求失败: {e}")) }),
+        Err(e) => {
+            return Ok(AnalyticsData {
+                daily: vec![],
+                total_tokens: None,
+                peak_tokens: None,
+                error: Some(format!("请求失败: {e}")),
+            })
+        }
     };
     let status = resp.status();
-    let body = match resp.text().await { Ok(b) => b, Err(e) => return Ok(AnalyticsData { daily: vec![], total_tokens: None, peak_tokens: None, error: Some(e.to_string()) }) };
+    let body = match resp.text().await {
+        Ok(b) => b,
+        Err(e) => {
+            return Ok(AnalyticsData {
+                daily: vec![],
+                total_tokens: None,
+                peak_tokens: None,
+                error: Some(e.to_string()),
+            })
+        }
+    };
     if !status.is_success() {
-        return Ok(AnalyticsData { daily: vec![], total_tokens: None, peak_tokens: None, error: Some(format!("HTTP {status}")) });
+        return Ok(AnalyticsData {
+            daily: vec![],
+            total_tokens: None,
+            peak_tokens: None,
+            error: Some(format!("HTTP {status}")),
+        });
     }
     // 尝试解析通用结构
-    let v: serde_json::Value = match serde_json::from_str(&body) { Ok(v) => v, Err(e) => return Ok(AnalyticsData { daily: vec![], total_tokens: None, peak_tokens: None, error: Some(format!("解析失败: {e}")) }) };
+    let v: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(AnalyticsData {
+                daily: vec![],
+                total_tokens: None,
+                peak_tokens: None,
+                error: Some(format!("解析失败: {e}")),
+            })
+        }
+    };
     let mut daily = vec![];
     let mut total = 0f64;
     let mut peak = 0f64;
     if let Some(arr) = v.as_array() {
         for item in arr {
-            let date = item.get("date").and_then(|d| d.as_str()).map(|s| s.to_string());
+            let date = item
+                .get("date")
+                .and_then(|d| d.as_str())
+                .map(|s| s.to_string());
             let used = item.get("used_percent").and_then(|x| x.as_f64());
-            let tokens = item.get("tokens").or_else(|| item.get("counts")).and_then(|x| x.as_f64());
-            if let Some(t) = tokens { total += t; if t > peak { peak = t; } }
-            daily.push(DailyUsage { date, used_percent: used, tokens });
+            let tokens = item
+                .get("tokens")
+                .or_else(|| item.get("counts"))
+                .and_then(|x| x.as_f64());
+            if let Some(t) = tokens {
+                total += t;
+                if t > peak {
+                    peak = t;
+                }
+            }
+            daily.push(DailyUsage {
+                date,
+                used_percent: used,
+                tokens,
+            });
         }
     }
-    Ok(AnalyticsData { daily, total_tokens: Some(total), peak_tokens: Some(peak), error: None })
+    Ok(AnalyticsData {
+        daily,
+        total_tokens: Some(total),
+        peak_tokens: Some(peak),
+        error: None,
+    })
 }

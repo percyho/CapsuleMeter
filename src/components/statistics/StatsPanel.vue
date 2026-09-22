@@ -27,7 +27,7 @@ type QuotaWindow = "fiveHour" | "weekly";
 type QuotaRange = 1 | 7 | 14 | 30;
 type TokenRange = 7 | 30 | 90 | 365 | 3650;
 
-const props = defineProps<{ historyPoints: HistoryPoint[]; uiTheme: "dark" | "light" }>();
+const props = defineProps<{ historyPoints: HistoryPoint[]; uiTheme: "dark" | "light" | "system" }>();
 const emit = defineEmits<{ openHistory: [] }>();
 
 const activeView = shallowRef<ViewTab>("quota");

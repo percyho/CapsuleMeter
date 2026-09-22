@@ -1,9 +1,10 @@
 import { onBeforeUnmount, onMounted, shallowRef } from "vue";
 
-export type UiTheme = "dark" | "light";
+export type UiTheme = "dark" | "light" | "system";
 
 function readTheme(): UiTheme {
-  return localStorage.getItem("uiTheme") === "light" ? "light" : "dark";
+  const value = localStorage.getItem("uiTheme");
+  return value === "light" || value === "system" ? value : "dark";
 }
 
 export function useUiTheme(options: { syncAcrossWindows?: boolean; onChange?: () => void } = {}) {
@@ -11,7 +12,10 @@ export function useUiTheme(options: { syncAcrossWindows?: boolean; onChange?: ()
 
   function applyTheme(theme = uiTheme.value) {
     uiTheme.value = theme;
-    document.documentElement.dataset.uiTheme = theme;
+    const resolved = theme === "system"
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : theme;
+    document.documentElement.dataset.uiTheme = resolved;
   }
 
   function setUiTheme(theme: UiTheme) {
@@ -26,11 +30,22 @@ export function useUiTheme(options: { syncAcrossWindows?: boolean; onChange?: ()
     options.onChange?.();
   }
 
+  function onSystemThemeChange() {
+    if (uiTheme.value === "system") {
+      applyTheme("system");
+      options.onChange?.();
+    }
+  }
+
   onMounted(() => {
     applyTheme();
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onSystemThemeChange);
     if (options.syncAcrossWindows) window.addEventListener("storage", onStorage);
   });
-  onBeforeUnmount(() => window.removeEventListener("storage", onStorage));
+  onBeforeUnmount(() => {
+    window.removeEventListener("storage", onStorage);
+    window.matchMedia("(prefers-color-scheme: dark)").removeEventListener("change", onSystemThemeChange);
+  });
 
   return { uiTheme, applyTheme, setUiTheme };
 }

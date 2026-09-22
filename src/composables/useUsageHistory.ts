@@ -2,7 +2,6 @@ import { onBeforeUnmount, onMounted, shallowRef } from "vue";
 import type { HistoryPoint, UsageData } from "../types/usage";
 
 const STORAGE_KEY = "usageHistory";
-const RETENTION_MS = 30 * 86_400_000;
 
 export function readUsageHistory(): HistoryPoint[] {
   try {
@@ -21,6 +20,8 @@ export function useUsageHistory(options: { syncAcrossWindows?: boolean; onChange
   }
 
   function appendUsage(usage: UsageData, timestamp = Date.now()) {
+    const retentionDays = Math.max(7, Number(localStorage.getItem("historyRetentionDays") ?? "30"));
+    const retentionMs = retentionDays * 86_400_000;
     const next = [
       ...historyPoints.value,
       {
@@ -28,7 +29,7 @@ export function useUsageHistory(options: { syncAcrossWindows?: boolean; onChange
         fiveHour: usage.five_hour?.remaining_percent,
         weekly: usage.weekly?.remaining_percent,
       },
-    ].filter((point) => point.t > timestamp - RETENTION_MS);
+    ].filter((point) => point.t > timestamp - retentionMs);
     historyPoints.value = next;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }
