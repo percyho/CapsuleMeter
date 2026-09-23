@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -21,6 +22,8 @@ pub struct WindowData {
 pub struct UsageData {
     /// 套餐类型：plus / pro / free ...
     pub plan: Option<String>,
+    /// 当前 Codex 登录账号（优先为邮箱）
+    pub account: Option<String>,
     /// 5 小时窗口
     pub five_hour: WindowData,
     /// 周窗口
@@ -75,6 +78,8 @@ struct AuthTokens {
     access_token: Option<String>,
     #[serde(rename = "account_id")]
     account_id: Option<String>,
+    #[serde(rename = "id_token")]
+    id_token: Option<String>,
 }
 
 fn codex_home() -> PathBuf {
@@ -87,7 +92,18 @@ fn codex_home() -> PathBuf {
     PathBuf::from(base).join(".codex")
 }
 
-fn load_auth() -> Result<(String, String), String> {
+fn account_from_id_token(id_token: Option<&str>) -> Option<String> {
+    let payload = id_token?.split('.').nth(1)?;
+    let bytes = URL_SAFE_NO_PAD.decode(payload).ok()?;
+    let claims: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    claims
+        .get("email")
+        .and_then(|value| value.as_str())
+        .filter(|email| !email.is_empty())
+        .map(str::to_owned)
+}
+
+fn load_auth() -> Result<(String, String, Option<String>), String> {
     let auth_path = codex_home().join("auth.json");
     let raw = std::fs::read_to_string(&auth_path)
         .map_err(|e| format!("无法读取 {}：{}", auth_path.display(), e))?;
@@ -100,8 +116,11 @@ fn load_auth() -> Result<(String, String), String> {
         .access_token
         .filter(|s| !s.is_empty())
         .ok_or_else(|| "缺少 access_token，请先运行 codex login".to_string())?;
+    let display_account = account_from_id_token(tokens.id_token.as_deref());
     let account = tokens.account_id.unwrap_or_default();
-    Ok((access, account))
+    let display_account =
+        display_account.or_else(|| (!account.is_empty()).then(|| account.clone()));
+    Ok((access, account, display_account))
 }
 
 /// 读取 Windows 系统代理（注册表 Internet Settings），返回 http://host:port
@@ -176,11 +195,12 @@ fn to_window(w: Option<&RawWindow>) -> WindowData {
 
 #[tauri::command]
 pub async fn fetch_usage() -> Result<UsageData, String> {
-    let (access, account) = match load_auth() {
+    let (access, account, display_account) = match load_auth() {
         Ok(v) => v,
         Err(e) => {
             return Ok(UsageData {
                 plan: None,
+                account: None,
                 five_hour: empty_window(),
                 weekly: empty_window(),
                 error: Some(e),
@@ -200,6 +220,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
         Err(e) => {
             return Ok(UsageData {
                 plan: None,
+                account: display_account.clone(),
                 five_hour: empty_window(),
                 weekly: empty_window(),
                 error: Some(format!("请求用量接口失败：{}", e)),
@@ -212,6 +233,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
         Err(e) => {
             return Ok(UsageData {
                 plan: None,
+                account: display_account.clone(),
                 five_hour: empty_window(),
                 weekly: empty_window(),
                 error: Some(format!("读取响应失败：{}", e)),
@@ -222,6 +244,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
     if status == 401 {
         return Ok(UsageData {
             plan: None,
+            account: display_account.clone(),
             five_hour: empty_window(),
             weekly: empty_window(),
             error: Some("登录已过期，请运行 codex login 或打开 Codex 应用刷新登录".to_string()),
@@ -230,6 +253,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
     if !status.is_success() {
         return Ok(UsageData {
             plan: None,
+            account: display_account.clone(),
             five_hour: empty_window(),
             weekly: empty_window(),
             error: Some(format!("用量接口返回 HTTP {}", status)),
@@ -241,6 +265,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
         Err(e) => {
             return Ok(UsageData {
                 plan: None,
+                account: display_account.clone(),
                 five_hour: empty_window(),
                 weekly: empty_window(),
                 error: Some(format!("解析用量响应失败：{}", e)),
@@ -250,6 +275,7 @@ pub async fn fetch_usage() -> Result<UsageData, String> {
 
     Ok(UsageData {
         plan: raw.plan_type,
+        account: display_account,
         five_hour: to_window(
             raw.rate_limit
                 .as_ref()
@@ -281,7 +307,7 @@ pub struct AnalyticsData {
 
 #[tauri::command]
 pub async fn fetch_analytics(days: u32) -> Result<AnalyticsData, String> {
-    let (access, account) = match load_auth() {
+    let (access, account, _) = match load_auth() {
         Ok(v) => v,
         Err(e) => {
             return Ok(AnalyticsData {

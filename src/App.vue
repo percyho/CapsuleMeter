@@ -3,7 +3,6 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
-import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import {
   enable as autostartEnable,
@@ -15,6 +14,7 @@ import ResetCreditsCard from "./components/usage/ResetCreditsCard.vue";
 import { useUiTheme } from "./composables/useUiTheme";
 import { useLocale } from "./composables/useLocale";
 import { useUsageHistory } from "./composables/useUsageHistory";
+import { useGlobalShortcut } from "./composables/useGlobalShortcut";
 import type {
   ConsumeResetResult,
   ResetCreditsSummary,
@@ -81,8 +81,11 @@ let rightTimer: number | undefined;
 // —— 可配置项（localStorage 持久化）——
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
-type CapsuleStyle = "solid" | "beads";
-const capsuleStyle = ref<CapsuleStyle>(localStorage.getItem("capsuleStyle") === "beads" ? "beads" : "solid");
+type CapsuleStyle = "realistic" | "pixel";
+const storedCapsuleStyle = localStorage.getItem("capsuleStyle");
+const capsuleStyle = ref<CapsuleStyle>(
+  storedCapsuleStyle === "pixel" || storedCapsuleStyle === "beads" ? "pixel" : "realistic",
+);
 const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
 const { locale, setLocale, t } = useLocale();
 const activeTab = ref("appearance");
@@ -92,7 +95,7 @@ function recordHistory() {
   appendUsage(usage.value);
 }
 async function onQuit() {
-  await getCurrentWindow().close();
+  await invoke("quit_app");
 }
 
 
@@ -104,13 +107,36 @@ const resetShowSec = ref(Number(localStorage.getItem("resetShowSec") ?? "5"));
 const historyRetentionDays = ref(Number(localStorage.getItem("historyRetentionDays") ?? "30"));
 const notificationsEnabled = ref(localStorage.getItem("notificationsEnabled") === "true");
 const notificationThreshold = ref(Number(localStorage.getItem("notificationThreshold") ?? "20"));
-const shortcutEnabled = ref(localStorage.getItem("shortcutEnabled") !== "false");
+const capsuleVisible = ref(localStorage.getItem("capsuleVisible") !== "false");
 type TrayIconMode = "logo" | "usage";
 const trayIconMode = ref<TrayIconMode>(localStorage.getItem("trayIconMode") === "usage" ? "usage" : "logo");
 const systemMessage = ref("");
 const autostart = ref(false);
-const GLOBAL_SHORTCUT = "CommandOrControl+Shift+U";
 let unlistenEvents: UnlistenFn[] = [];
+
+const {
+  shortcut: globalShortcut,
+  enabled: shortcutEnabled,
+  capture: captureGlobalShortcut,
+  registerCurrent: applyGlobalShortcut,
+  reset: resetGlobalShortcut,
+  setEnabled: setShortcutEnabled,
+} = useGlobalShortcut({
+  defaultShortcut: "Ctrl+Shift+U",
+  onTriggered: async () => {
+    const win = getCurrentWindow();
+    if (await win.isVisible()) {
+      capsuleVisible.value = false;
+      localStorage.setItem("capsuleVisible", "false");
+      await win.hide();
+    } else {
+      capsuleVisible.value = true;
+      localStorage.setItem("capsuleVisible", "true");
+      await win.show();
+      await win.setFocus();
+    }
+  },
+});
 
 // —— 显示值（支持剩余/已用模式切换）——
 function pickPct(w: WindowData | undefined): number | null {
@@ -334,21 +360,25 @@ async function maybeNotifyLowUsage(data: UsageData) {
   localStorage.setItem("lastNotifiedCycle", cycle);
 }
 
-async function applyGlobalShortcut() {
-  try { await unregister(GLOBAL_SHORTCUT); } catch {}
-  if (!shortcutEnabled.value) return;
-  await register(GLOBAL_SHORTCUT, async (event) => {
-    if (event.state !== "Pressed") return;
-    const win = getCurrentWindow();
-    if (await win.isVisible()) await win.hide();
-    else { await win.show(); await win.setFocus(); }
-  });
+async function onShortcutChange() {
+  const nextEnabled = !shortcutEnabled.value;
+  try {
+    await setShortcutEnabled(nextEnabled);
+    systemMessage.value = nextEnabled ? `快捷键已启用：${globalShortcut.value}` : "快捷键已停用";
+  } catch (reason) {
+    systemMessage.value = `快捷键注册失败：${String(reason)}`;
+  }
 }
 
-async function onShortcutChange() {
-  localStorage.setItem("shortcutEnabled", String(shortcutEnabled.value));
-  try { await applyGlobalShortcut(); systemMessage.value = shortcutEnabled.value ? `快捷键已启用：${GLOBAL_SHORTCUT}` : "快捷键已停用"; }
-  catch (reason) { shortcutEnabled.value = false; systemMessage.value = `快捷键注册失败：${String(reason)}`; }
+async function onShortcutKeydown(event: KeyboardEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  try {
+    const value = await captureGlobalShortcut(event);
+    systemMessage.value = value ? `快捷键已更新：${value}` : "请按下 Ctrl、Alt 或 Meta 与其他按键的组合";
+  } catch (reason) {
+    systemMessage.value = `快捷键注册失败：${String(reason)}`;
+  }
 }
 
 async function onNotificationChange() {
@@ -432,6 +462,22 @@ function onSnapChange() {
   applySnap();
 }
 
+async function setCapsuleVisibility(visible: boolean) {
+  capsuleVisible.value = visible;
+  localStorage.setItem("capsuleVisible", String(visible));
+  const win = getCurrentWindow();
+  if (visible) {
+    await win.show();
+    await win.setFocus();
+  } else {
+    await win.hide();
+  }
+}
+
+function onCapsuleVisibilityChange() {
+  void setCapsuleVisibility(!capsuleVisible.value);
+}
+
 function onDisplayModeChange() {
   localStorage.setItem("displayMode", displayMode.value);
 }
@@ -480,6 +526,11 @@ const PANEL_MIN_HEIGHT = 280;
 const panelW = ref(Math.min(600, Math.max(PANEL_MIN_WIDTH, Number(localStorage.getItem("panelW") ?? PANEL_DEFAULT_WIDTH))));
 const panelH = ref(Math.min(800, Math.max(PANEL_MIN_HEIGHT, Number(localStorage.getItem("panelH") ?? PANEL_DEFAULT_HEIGHT))));
 let panelResize: { sx: number; sy: number; w: number; h: number } | null = null;
+
+function onPanelDragStart(event: MouseEvent) {
+  if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+  startWindowDrag();
+}
 
 function onPanelResizeStart(e: MouseEvent) {
   e.preventDefault();
@@ -541,7 +592,7 @@ function onContextMenu(e: MouseEvent) {
 function resetDefaults() {
   opacity.value = 0.72;
   fontSize.value = 13;
-  capsuleStyle.value = "solid";
+  capsuleStyle.value = "realistic";
   uiTheme.value = "dark";
   setLocale("zh-CN");
   alwaysOnTop.value = true;
@@ -552,17 +603,21 @@ function resetDefaults() {
   historyRetentionDays.value = 30;
   notificationsEnabled.value = false;
   notificationThreshold.value = 20;
-  shortcutEnabled.value = true;
+  capsuleVisible.value = true;
   trayIconMode.value = "logo";
   panelW.value = PANEL_DEFAULT_WIDTH;
   panelH.value = PANEL_DEFAULT_HEIGHT;
-  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "appLocale", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "shortcutEnabled", "trayIconMode", "panelW", "panelH"].forEach((k) =>
+  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "appLocale", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "capsuleVisible", "trayIconMode", "panelW", "panelH"].forEach((k) =>
     localStorage.removeItem(k)
   );
   applyWindowSettings();
   applyAlwaysOnTop();
   applySnap();
   restartInterval();
+  void setCapsuleVisibility(true);
+  void resetGlobalShortcut().catch((reason) => {
+    systemMessage.value = `快捷键恢复失败：${String(reason)}`;
+  });
   if (autostart.value) {
     autostart.value = false;
     onAutostartChange();
@@ -578,12 +633,20 @@ onMounted(() => {
   refresh();
   restartInterval();
   void applyGlobalShortcut().catch((reason) => {
-    shortcutEnabled.value = false;
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   });
   void updateTrayIcon();
+  if (!capsuleVisible.value) void getCurrentWindow().hide();
   void listen("tray-refresh", () => void refresh()).then(unlisten => unlistenEvents.push(unlisten));
-  void listen("tray-open-settings", () => { if (!showPanel.value) void togglePanel(); }).then(unlisten => unlistenEvents.push(unlisten));
+  void listen("tray-show", () => {
+    capsuleVisible.value = true;
+    localStorage.setItem("capsuleVisible", "true");
+  }).then(unlisten => unlistenEvents.push(unlisten));
+  void listen("tray-open-settings", () => {
+    capsuleVisible.value = true;
+    localStorage.setItem("capsuleVisible", "true");
+    if (!showPanel.value) void togglePanel();
+  }).then(unlisten => unlistenEvents.push(unlisten));
   void getCurrentWindow().onFocusChanged(({ payload }) => {
     if (payload && lastError.value?.includes("登录已过期")) void refresh();
   }).then(unlisten => unlistenEvents.push(unlisten));
@@ -594,7 +657,6 @@ onBeforeUnmount(() => {
   clearTimer("left");
   clearTimer("right");
   unlistenEvents.forEach(unlisten => unlisten());
-  void unregister(GLOBAL_SHORTCUT).catch(() => {});
 });
 </script>
 
@@ -611,12 +673,15 @@ onBeforeUnmount(() => {
   </div>
 
   <div v-if="showPanel" class="panel" :class='{ "align-right": panelAlignRight }' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
-    <div class="panel-head">
+    <div class="panel-head" @mousedown="onPanelDragStart">
       <div class="panel-heading">
         <span class="panel-title">{{ t("设置") }}</span>
         <span class="panel-description">{{ t("个性化用量胶囊") }}</span>
       </div>
-      <span class="panel-sub">{{ lastError ? t("数据异常") : (usage?.plan || t("未登录")).toUpperCase() }}</span>
+      <div class="panel-account">
+        <span class="panel-sub">{{ lastError ? t("数据异常") : (usage?.plan || t("未登录")).toUpperCase() }}</span>
+        <span v-if="usage?.account && !lastError" class="panel-account-name" :title="usage.account">{{ usage.account }}</span>
+      </div>
       <button class="panel-close" :title="t('关闭设置')" :aria-label="t('关闭设置')" @click="togglePanel()">×</button>
     </div>
 
@@ -644,6 +709,13 @@ onBeforeUnmount(() => {
         <div class="seg" aria-label="Language">
           <button :class="{ on: locale === 'zh-CN' }" @click="setLocale('zh-CN')">中文</button>
           <button :class="{ on: locale === 'en-US' }" @click="setLocale('en-US')">English</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="row-name">{{ t("胶囊主题") }}</span>
+        <div class="seg" :aria-label="t('胶囊主题')">
+          <button :class="{ on: capsuleStyle === 'realistic' }" @click="setCapsuleStyle('realistic')">{{ t("仿真") }}</button>
+          <button :class="{ on: capsuleStyle === 'pixel' }" @click="setCapsuleStyle('pixel')">{{ t("像素") }}</button>
         </div>
       </div>
       <div class="row">
@@ -700,13 +772,6 @@ onBeforeUnmount(() => {
         <button class="btn-mini" :disabled="loading" @click="refresh()">{{ loading ? t("刷新中…") : t("立即刷新") }}</button>
       </div>
       <div class="row">
-        <span class="row-name">{{ t("胶囊填充") }}</span>
-        <div class="seg" aria-label="胶囊填充主题">
-          <button :class="{ on: capsuleStyle === 'solid' }" @click="setCapsuleStyle('solid')">{{ t("纯色") }}</button>
-          <button :class="{ on: capsuleStyle === 'beads' }" @click="setCapsuleStyle('beads')">{{ t("小药丸") }}</button>
-        </div>
-      </div>
-      <div class="row">
         <span class="row-name">{{ t("历史保留") }}</span>
         <select v-model.number="historyRetentionDays" @change="onRetentionChange">
           <option v-for="days in [7, 30, 90, 365]" :key="days" :value="days">{{ days === 365 ? (locale === "en-US" ? "1 year" : "1 年") : (locale === "en-US" ? `${days} days` : `${days} 天`) }}</option>
@@ -733,6 +798,12 @@ onBeforeUnmount(() => {
       <template v-if="activeTab==='system'">
       <div class="group-label">{{ t("系统") }}</div>
       <div class="row row-flat">
+        <span class="row-name">{{ t("显示胶囊") }}</span>
+        <button class="switch" :class="{ on: capsuleVisible }" @click="onCapsuleVisibilityChange()">
+          <span class="knob"></span>
+        </button>
+      </div>
+      <div class="row row-flat">
         <span class="row-name">{{ t("开机自启") }}</span>
         <button class="switch" :class="{ on: autostart }" @click="autostart = !autostart; onAutostartChange()">
           <span class="knob"></span>
@@ -756,8 +827,8 @@ onBeforeUnmount(() => {
       </div>
       <div class="row row-flat">
         <span class="row-name">{{ t("全局快捷键") }}</span>
-        <span class="row-val">Ctrl+Shift+U</span>
-        <button class="switch" :class="{ on: shortcutEnabled }" @click="shortcutEnabled = !shortcutEnabled; onShortcutChange()"><span class="knob"></span></button>
+        <input class="shortcut-input" :value="globalShortcut" :aria-label="t('全局快捷键')" readonly @keydown="onShortcutKeydown" />
+        <button class="switch" :class="{ on: shortcutEnabled }" @click="onShortcutChange()"><span class="knob"></span></button>
       </div>
 
       <div class="group-label">{{ t("诊断与更新") }}</div>
@@ -947,22 +1018,40 @@ body {
 .capsule .half:hover { background: rgba(255, 255, 255, 0.1); }
 .capsule .half:active { background: rgba(255, 255, 255, 0.16); }
 
-.capsule-beads .fill {
-  background-color: rgba(33, 112, 190, 0.84);
-  background-image:
-    radial-gradient(circle at 2px 2px, #d8f3ff 0 0.8px, #6fc4f1 1px 2px, #287fb6 2.2px 2.7px, transparent 2.9px),
-    radial-gradient(circle at 2px 2px, #bdeaff 0 0.7px, #4faadc 1px 2px, #246f9f 2.2px 2.7px, transparent 2.9px);
-  background-position: 0 0, 3px 3px;
-  background-size: 6px 6px;
+.capsule-realistic .fill {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 36%, rgba(0, 34, 78, 0.22) 100%),
+    linear-gradient(90deg, #236fca, #67b9ff);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.38), inset 0 -2px 3px rgba(0, 31, 68, 0.24);
 }
 
-.capsule-beads .fill--red {
-  background-color: rgba(180, 54, 69, 0.86);
+.capsule-realistic .fill--red {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 36%, rgba(91, 0, 20, 0.2) 100%),
+    linear-gradient(90deg, #ff887f, #d93d54);
+}
+
+.capsule-pixel {
+  image-rendering: pixelated;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.capsule-pixel .fill {
+  background-color: #287fc7;
   background-image:
-    radial-gradient(circle at 2px 2px, #ffd9d5 0 0.8px, #ff8a84 1px 2px, #c94352 2.2px 2.7px, transparent 2.9px),
-    radial-gradient(circle at 2px 2px, #ffc3bd 0 0.7px, #ef6d70 1px 2px, #a93649 2.2px 2.7px, transparent 2.9px);
-  background-position: 0 0, 3px 3px;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 50%, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.12) 50%, rgba(0, 39, 86, 0.16) 50%);
   background-size: 6px 6px;
+  box-shadow: inset -2px 0 0 rgba(255, 255, 255, 0.2);
+}
+
+.capsule-pixel .fill--red {
+  background-color: #dd4f5e;
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.17) 50%, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.11) 50%, rgba(91, 0, 20, 0.17) 50%);
+  background-size: 6px 6px;
+  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.18);
 }
 
 .num {
@@ -1000,6 +1089,8 @@ body {
 
 /* —— 设置面板 —— */
 .panel {
+  --panel-control-bg: rgba(255, 255, 255, 0.06);
+  --panel-control-active: rgba(255, 255, 255, 0.1);
   position: fixed;
   top: 30px;
   left: 0;
@@ -1023,7 +1114,11 @@ body {
   padding: 11px 13px 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
 }
+
+.panel-head:active { cursor: grabbing; }
 
 .panel-heading {
   display: flex;
@@ -1032,7 +1127,7 @@ body {
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--panel-title, #f4f6fb);
   letter-spacing: 0.2px;
@@ -1040,13 +1135,13 @@ body {
 
 .panel-description {
   color: var(--panel-val, #7f8799);
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
 .panel-sub {
   flex: 1;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--panel-accent, #7d98f5);
   text-align: right;
   overflow: hidden;
@@ -1079,6 +1174,29 @@ body {
   min-height: 0;
 }
 
+.panel-account {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  justify-items: end;
+  gap: 2px;
+}
+
+.panel-account .panel-sub {
+  width: 100%;
+}
+
+.panel-account-name {
+  overflow: hidden;
+  max-width: 150px;
+  color: var(--panel-val, #7f8799);
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
 .tabs {
   display: flex;
   flex: 0 0 92px;
@@ -1098,7 +1216,7 @@ body {
   border: none;
   background: transparent;
   color: var(--panel-val, #7f8799);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease;
@@ -1134,7 +1252,7 @@ body {
 }
 
 .group-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--panel-val, #8f8f8f);
   letter-spacing: 0.08em;
@@ -1154,7 +1272,7 @@ body {
   gap: 10px;
   min-height: 42px;
   padding: 8px 2px;
-  font-size: 11px;
+  font-size: 13px;
   color: #d8dce6;
   background: transparent;
   border: 0;
@@ -1176,7 +1294,7 @@ body {
 
 .row-val {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--panel-val, #8f97a8);
   min-width: 30px;
   text-align: right;
@@ -1241,8 +1359,8 @@ body {
   background: transparent;
   border: none;
   color: #9aa1b5;
-  font-size: 10px;
-  padding: 4px 12px;
+  font-size: 11px;
+  padding: 5px 11px;
   cursor: pointer;
   line-height: 12px;
 }
@@ -1253,6 +1371,27 @@ body {
 }
 
 /* 下拉选择 */
+.shortcut-input {
+  width: 112px;
+  margin-left: auto;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--panel-text, #d8dce6);
+  font: inherit;
+  font-size: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.shortcut-input:hover,
+.shortcut-input:focus {
+  border-color: var(--panel-accent, #7d98f5);
+  background: rgba(255, 255, 255, 0.11);
+}
+
 .panel select {
   background: rgba(255, 255, 255, 0.1);
   color: #d8dce6;
@@ -1260,8 +1399,8 @@ body {
   border-radius: 4px;
   min-width: 88px;
   margin-left: auto;
-  font-size: 10px;
-  padding: 5px 8px;
+  font-size: 11px;
+  padding: 6px 8px;
   outline: none;
   flex-shrink: 0;
 }
@@ -1277,8 +1416,8 @@ body {
   color: var(--panel-text, #ddd);
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 6px;
-  font-size: 10px;
-  padding: 6px 10px;
+  font-size: 11px;
+  padding: 7px 10px;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -1343,14 +1482,14 @@ body {
 
 .privacy-badge {
   color: #72c894;
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.4px;
 }
 
 .privacy-summary {
   margin: 7px 0 8px;
   color: var(--panel-text, #cfd4df);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.55;
 }
 
@@ -1367,7 +1506,7 @@ body {
   grid-template-columns: 56px minmax(0, 1fr);
   gap: 8px;
   color: var(--panel-val, #888);
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.5;
 }
 
@@ -1377,7 +1516,7 @@ body {
 }
 
 .system-actions { flex-wrap: wrap; justify-content: flex-end; }
-.system-message { color: var(--panel-val, #8f97a8); font-size: 9px; line-height: 1.5; padding: 2px; word-break: break-all; user-select: text; }
+.system-message { color: var(--panel-val, #8f97a8); font-size: 10px; line-height: 1.5; padding: 2px; word-break: break-all; user-select: text; }
 
 .chart-axis {
   display: flex;
@@ -1397,15 +1536,46 @@ body {
   background: rgba(0, 0, 0, 0.08);
 }
 
-.btn-secondary { margin-right: auto; }
-
-.btn-danger {
-  color: #ef9a9a;
-  border-color: rgba(239, 100, 100, 0.28);
-  background: rgba(239, 100, 100, 0.08);
+.btn-secondary {
+  margin-right: auto;
+  color: var(--panel-secondary-text, var(--panel-text, #ddd));
+  border-color: var(--panel-secondary-border, rgba(255, 255, 255, 0.14));
+  background: var(--panel-secondary-bg, rgba(255, 255, 255, 0.07));
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.btn-danger:hover { background: rgba(239, 100, 100, 0.18); }
+.btn-secondary:hover {
+  color: var(--panel-secondary-hover-text, #fff);
+  border-color: var(--panel-secondary-hover-border, rgba(255, 255, 255, 0.25));
+  background: var(--panel-secondary-hover, rgba(255, 255, 255, 0.14));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+  box-shadow: none;
+  transform: translateY(0);
+}
+
+.btn-danger {
+  color: var(--panel-danger-text, #ef9a9a);
+  border-color: var(--panel-danger-border, rgba(239, 100, 100, 0.28));
+  background: var(--panel-danger-bg, rgba(239, 100, 100, 0.08));
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.btn-danger:hover {
+  color: var(--panel-danger-hover-text, #ffd4d4);
+  border-color: var(--panel-danger-hover-border, rgba(239, 100, 100, 0.48));
+  background: var(--panel-danger-hover, rgba(239, 100, 100, 0.18));
+  box-shadow: 0 4px 12px rgba(168, 45, 45, 0.2);
+  transform: translateY(-1px);
+}
+.btn-danger:active {
+  background: var(--panel-danger-active, rgba(239, 100, 100, 0.24));
+  box-shadow: none;
+  transform: translateY(0);
+}
 
 .tab:focus-visible,
 .panel button:focus-visible,
@@ -1441,6 +1611,21 @@ html[data-ui-theme="light"] .panel {
   --panel-val: #667085;
   --panel-accent: #1f2937;
   --panel-bg-active: rgba(17, 24, 39, 0.07);
+  --panel-control-bg: #eceef1;
+  --panel-control-active: #ffffff;
+  --panel-danger-text: #b42318;
+  --panel-danger-border: rgba(180, 35, 24, 0.24);
+  --panel-danger-bg: rgba(180, 35, 24, 0.06);
+  --panel-danger-hover: rgba(180, 35, 24, 0.12);
+  --panel-danger-hover-text: #8f1d14;
+  --panel-danger-hover-border: rgba(180, 35, 24, 0.38);
+  --panel-danger-active: rgba(180, 35, 24, 0.18);
+  --panel-secondary-text: #475467;
+  --panel-secondary-border: rgba(20, 28, 42, 0.16);
+  --panel-secondary-bg: rgba(20, 28, 42, 0.035);
+  --panel-secondary-hover-text: #1d2939;
+  --panel-secondary-hover-border: rgba(20, 28, 42, 0.24);
+  --panel-secondary-hover: rgba(20, 28, 42, 0.09);
   box-shadow: 0 16px 40px rgba(16, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -1464,6 +1649,9 @@ html[data-ui-theme="light"] .seg button { color: #667085; }
 html[data-ui-theme="light"] .seg button.on { background: #242424; color: #fff; }
 html[data-ui-theme="light"] .panel select { background: #fff; color: #344054; border-color: rgba(20, 28, 42, 0.16); }
 html[data-ui-theme="light"] .panel select option { background: #fff; color: #344054; }
+html[data-ui-theme="light"] .shortcut-input { background: #fff; color: #344054; border-color: rgba(20, 28, 42, 0.16); }
+html[data-ui-theme="light"] .shortcut-input:hover,
+html[data-ui-theme="light"] .shortcut-input:focus { background: #f7f7f6; border-color: rgba(20, 28, 42, 0.36); }
 html[data-ui-theme="light"] .panel-foot { background: rgba(20, 28, 42, 0.025); }
 html[data-ui-theme="light"] .kpi-val { color: #1d2433; }
 html[data-ui-theme="light"] .panel-body::-webkit-scrollbar-thumb { background: rgba(20, 28, 42, 0.18); }

@@ -7,6 +7,7 @@ export interface WindowData {
 
 export interface UsageData {
   plan: string | null;
+  account: string | null;
   five_hour: WindowData;
   weekly: WindowData;
   error: string | null;

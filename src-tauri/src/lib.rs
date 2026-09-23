@@ -111,6 +111,11 @@ fn write_history_csv(path: String, contents: String) -> Result<(), String> {
     std::fs::write(path, contents).map_err(|error| format!("写入 CSV 失败：{error}"))
 }
 
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 fn usage_ring_icon(five_hour: f64, weekly: f64) -> tauri::image::Image<'static> {
     let size = 32u32;
     let mut rgba = vec![0u8; (size * size * 4) as usize];
@@ -209,7 +214,8 @@ pub fn run() {
             start_codex_login,
             diagnose_codex,
             check_update,
-            update_tray_icon
+            update_tray_icon,
+            quit_app
         ])
         .setup(|app| {
             use tauri::{
@@ -234,6 +240,7 @@ pub fn run() {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }
+                        let _ = app.emit("tray-show", ());
                     }
                     "refresh" => {
                         let _ = app.emit("tray-refresh", ());
@@ -259,6 +266,7 @@ pub fn run() {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }
+                        let _ = tray.app_handle().emit("tray-show", ());
                     }
                 })
                 .build(app)?;

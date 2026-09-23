@@ -271,20 +271,20 @@ onBeforeUnmount(() => {
 <style scoped>
 .stats-panel { display: flex; flex-direction: column; gap: 10px; min-height: 100%; }
 .stats-header, .control-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.view-tabs, .segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: rgba(255,255,255,0.06); }
-.view-tabs button, .segmented button { border: 0; border-radius: 7px; background: transparent; color: var(--panel-val, #8f97a8); cursor: pointer; font-size: 10px; padding: 5px 8px; white-space: nowrap; }
-.view-tabs button.active, .segmented button.active { color: var(--panel-text, #f4f6fb); background: rgba(255,255,255,0.1); box-shadow: 0 1px 3px rgba(0,0,0,0.18); font-weight: 600; }
-.detail-button { border: 0; background: transparent; color: var(--panel-accent, #7d98f5); cursor: pointer; font-size: 10px; padding: 4px; }
+.view-tabs, .segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--panel-control-bg, rgba(255,255,255,0.06)); }
+.view-tabs button, .segmented button { border: 0; border-radius: 7px; background: transparent; color: var(--panel-val, #8f97a8); cursor: pointer; font-size: 11px; padding: 6px 8px; white-space: nowrap; }
+.view-tabs button.active, .segmented button.active { color: var(--panel-text, #f4f6fb); background: var(--panel-control-active, rgba(255,255,255,0.1)); box-shadow: 0 1px 3px rgba(0,0,0,0.14); font-weight: 600; }
+.detail-button { border: 0; background: transparent; color: var(--panel-accent, #7d98f5); cursor: pointer; font-size: 11px; padding: 4px; }
 .range-segmented button { padding-inline: 6px; }
 .token-ranges { max-width: 100%; overflow-x: auto; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .metric { min-width: 0; padding: 8px 5px; border: 1px solid rgba(255,255,255,0.07); border-radius: 9px; background: rgba(255,255,255,0.04); text-align: center; }
 .metric strong { display: block; overflow: hidden; color: var(--panel-title, #f4f6fb); font-size: 14px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
-.metric span { display: block; margin-top: 3px; color: var(--panel-val, #8f97a8); font-size: 8px; white-space: nowrap; }
+.metric span { display: block; margin-top: 3px; color: var(--panel-val, #8f97a8); font-size: 10px; white-space: nowrap; }
 .stats-chart { width: 100%; min-height: 150px; flex: 1; }
-.status-text { margin-left: auto; color: var(--panel-val, #8f97a8); font-size: 9px; }
+.status-text { margin-left: auto; color: var(--panel-val, #8f97a8); font-size: 10px; }
 .status-text.error { color: #ff9f43; }
-.privacy-note { margin: 0; padding-top: 7px; border-top: 1px solid rgba(255,255,255,0.07); color: var(--panel-val, #8f97a8); font-size: 9px; text-align: center; }
+.privacy-note { margin: 0; padding-top: 7px; border-top: 1px solid rgba(255,255,255,0.07); color: var(--panel-val, #8f97a8); font-size: 10px; text-align: center; }
 button:focus-visible { outline: 2px solid var(--panel-accent, #6b8af0); outline-offset: 2px; }
 @media (max-width: 340px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .control-row { align-items: flex-start; flex-direction: column; } }
 </style>
