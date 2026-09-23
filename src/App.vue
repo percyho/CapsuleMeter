@@ -102,6 +102,7 @@ async function onQuit() {
 const alwaysOnTop = ref(localStorage.getItem("alwaysOnTop") !== "false");
 const snapEnabled = ref(localStorage.getItem("snapEnabled") !== "false");
 const displayMode = ref(localStorage.getItem("displayMode") ?? "remaining"); // remaining | used
+const showUsageValues = ref(localStorage.getItem("showUsageValues") !== "false");
 const refreshMin = ref(Number(localStorage.getItem("refreshMin") ?? "5"));
 const resetShowSec = ref(Number(localStorage.getItem("resetShowSec") ?? "5"));
 const historyRetentionDays = ref(Number(localStorage.getItem("historyRetentionDays") ?? "30"));
@@ -482,6 +483,11 @@ function onDisplayModeChange() {
   localStorage.setItem("displayMode", displayMode.value);
 }
 
+function onShowUsageValuesChange() {
+  showUsageValues.value = !showUsageValues.value;
+  localStorage.setItem("showUsageValues", String(showUsageValues.value));
+}
+
 function onResetShowSecChange() {
   localStorage.setItem("resetShowSec", String(resetShowSec.value));
   // 若正在显示重置时间，立即用新时长重新计时
@@ -523,9 +529,11 @@ const PANEL_DEFAULT_WIDTH = 360;
 const PANEL_DEFAULT_HEIGHT = 380;
 const PANEL_MIN_WIDTH = 320;
 const PANEL_MIN_HEIGHT = 280;
-const panelW = ref(Math.min(600, Math.max(PANEL_MIN_WIDTH, Number(localStorage.getItem("panelW") ?? PANEL_DEFAULT_WIDTH))));
-const panelH = ref(Math.min(800, Math.max(PANEL_MIN_HEIGHT, Number(localStorage.getItem("panelH") ?? PANEL_DEFAULT_HEIGHT))));
-let panelResize: { sx: number; sy: number; w: number; h: number } | null = null;
+const storedPanelW = Number(localStorage.getItem("panelW") ?? PANEL_DEFAULT_WIDTH);
+const storedPanelH = Number(localStorage.getItem("panelH") ?? PANEL_DEFAULT_HEIGHT);
+const panelW = ref(Math.max(PANEL_MIN_WIDTH, Number.isFinite(storedPanelW) ? storedPanelW : PANEL_DEFAULT_WIDTH));
+const panelH = ref(Math.max(PANEL_MIN_HEIGHT, Number.isFinite(storedPanelH) ? storedPanelH : PANEL_DEFAULT_HEIGHT));
+let panelResize: { sx: number; sy: number; x: number; y: number; w: number; h: number } | null = null;
 
 function onPanelDragStart(event: MouseEvent) {
   if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
@@ -535,17 +543,27 @@ function onPanelDragStart(event: MouseEvent) {
 function onPanelResizeStart(e: MouseEvent) {
   e.preventDefault();
   e.stopPropagation();
-  panelResize = { sx: e.clientX, sy: e.clientY, w: panelW.value, h: panelH.value };
+  panelResize = {
+    sx: e.screenX,
+    sy: e.screenY,
+    x: window.screenX,
+    y: window.screenY,
+    w: panelW.value,
+    h: panelH.value,
+  };
   window.addEventListener("mousemove", onPanelResizeMove);
   window.addEventListener("mouseup", onPanelResizeEnd);
 }
 function onPanelResizeMove(e: MouseEvent) {
   if (!panelResize) return;
-  const dx = e.clientX - panelResize.sx;
-  const dy = e.clientY - panelResize.sy;
-  panelW.value = Math.max(PANEL_MIN_WIDTH, Math.min(600, panelResize.w + dx));
-  panelH.value = Math.max(PANEL_MIN_HEIGHT, Math.min(800, panelResize.h + dy));
-  getCurrentWindow().setSize(new LogicalSize(panelW.value, 30 + panelH.value));
+  const dx = e.screenX - panelResize.sx;
+  const dy = e.screenY - panelResize.sy;
+  panelW.value = Math.max(PANEL_MIN_WIDTH, panelResize.w - dx);
+  panelH.value = Math.max(PANEL_MIN_HEIGHT, panelResize.h + dy);
+  const appliedDx = panelResize.w - panelW.value;
+  const win = getCurrentWindow();
+  void win.setSize(new LogicalSize(panelW.value, 30 + panelH.value));
+  void win.setPosition(new LogicalPosition(panelResize.x + appliedDx, panelResize.y));
 }
 function onPanelResizeEnd() {
   localStorage.setItem("panelW", String(panelW.value));
@@ -598,6 +616,7 @@ function resetDefaults() {
   alwaysOnTop.value = true;
   snapEnabled.value = true;
   displayMode.value = "remaining";
+  showUsageValues.value = true;
   refreshMin.value = 5;
   resetShowSec.value = 5;
   historyRetentionDays.value = 30;
@@ -607,7 +626,7 @@ function resetDefaults() {
   trayIconMode.value = "logo";
   panelW.value = PANEL_DEFAULT_WIDTH;
   panelH.value = PANEL_DEFAULT_HEIGHT;
-  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "appLocale", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "capsuleVisible", "trayIconMode", "panelW", "panelH"].forEach((k) =>
+  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "appLocale", "alwaysOnTop", "snapEnabled", "displayMode", "showUsageValues", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "capsuleVisible", "trayIconMode", "panelW", "panelH"].forEach((k) =>
     localStorage.removeItem(k)
   );
   applyWindowSettings();
@@ -664,11 +683,11 @@ onBeforeUnmount(() => {
   <div class="capsule" :class="[{'error': lastError}, {'capsule-right': panelAlignRight}, `capsule-${capsuleStyle}`]" @mousedown="onCapsuleMouseDown" @contextmenu="onContextMenu">
     <div class="half left" @click="onLeftClick" :title="leftTitle">
       <div class="fill" :style="{ width: leftFillWidth }"></div>
-      <span class="num" :class="{ dim: showLeftReset }">{{ leftDisplay }}</span>
+      <span v-show="showUsageValues" class="num" :class="{ dim: showLeftReset }">{{ leftDisplay }}</span>
     </div>
     <div class="half right" @click="onRightClick" :title="rightTitle">
       <div class="fill fill--red" :style="{ width: rightFillWidth }"></div>
-      <span class="num" :class="{ dim: showRightReset }">{{ rightDisplay }}</span>
+      <span v-show="showUsageValues" class="num" :class="{ dim: showRightReset }">{{ rightDisplay }}</span>
     </div>
   </div>
 
@@ -816,6 +835,12 @@ onBeforeUnmount(() => {
           <button :class="{ on: trayIconMode === 'usage' }" @click="onTrayIconModeChange('usage')">{{ t("用量环") }}</button>
         </div>
       </div>
+      <div class="row">
+        <span class="row-name">{{ t("显示用量数值") }}</span>
+        <button class="switch" :class="{ on: showUsageValues }" @click="onShowUsageValuesChange()">
+          <span class="knob"></span>
+        </button>
+      </div>
 
       <div class="row row-flat">
         <span class="row-name">{{ t("低额度通知") }}</span>
@@ -962,7 +987,7 @@ body {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(55, 61, 74, 0.97), rgba(28, 32, 41, 0.97));
+  background: linear-gradient(180deg, rgba(49, 51, 63, 0.98), rgba(24, 25, 32, 0.98));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 7px rgba(0, 0, 0, 0.28);
   transition: background-color 0.18s ease;
 }
@@ -974,7 +999,7 @@ body {
   top: 0;
   bottom: 0;
   width: 0%;
-  background: linear-gradient(90deg, rgba(42, 122, 219, 0.92), rgba(90, 173, 255, 0.95));
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.94), rgba(139, 92, 246, 0.96));
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.15);
   transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -982,7 +1007,7 @@ body {
 .fill--red {
   left: 0;
   right: auto;
-  background: linear-gradient(90deg, rgba(255, 124, 112, 0.94), rgba(224, 73, 87, 0.94));
+  background: linear-gradient(90deg, rgba(255, 138, 101, 0.96), rgba(225, 29, 72, 0.95));
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.13);
 }
 
@@ -1006,12 +1031,12 @@ body {
   padding: 0;
   background:
     linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.14) 48%, transparent 74%) 180% 0 / 220% 100%,
-    linear-gradient(180deg, rgba(55, 61, 74, 0.96), rgba(28, 32, 41, 0.96));
+    linear-gradient(180deg, rgba(49, 51, 63, 0.97), rgba(23, 24, 31, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.24), 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
-.capsule:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 4px 13px rgba(0, 0, 0, 0.36), 0 0 10px rgba(75, 151, 235, 0.14); }
+.capsule:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 4px 13px rgba(0, 0, 0, 0.36), 0 0 11px rgba(111, 92, 246, 0.2); }
 .capsule:active { background: linear-gradient(rgba(96, 110, 137, 0.22), rgba(96, 110, 137, 0.22)), linear-gradient(180deg, rgba(45, 51, 64, 0.98), rgba(22, 26, 34, 0.98)); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.34), 0 1px 4px rgba(0, 0, 0, 0.26); }
 .capsule::before, .capsule::after { display: block; }
 .capsule .half { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -1020,15 +1045,15 @@ body {
 
 .capsule-realistic .fill {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 36%, rgba(0, 34, 78, 0.22) 100%),
-    linear-gradient(90deg, #236fca, #67b9ff);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.38), inset 0 -2px 3px rgba(0, 31, 68, 0.24);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 36%, rgba(35, 24, 104, 0.24) 100%),
+    linear-gradient(90deg, #4f46e5, #9b87f5);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), inset 0 -2px 3px rgba(35, 24, 104, 0.28);
 }
 
 .capsule-realistic .fill--red {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 36%, rgba(91, 0, 20, 0.2) 100%),
-    linear-gradient(90deg, #ff887f, #d93d54);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 36%, rgba(102, 11, 39, 0.22) 100%),
+    linear-gradient(90deg, #ff956f, #e11d48);
 }
 
 .capsule-pixel {
@@ -1037,16 +1062,16 @@ body {
 }
 
 .capsule-pixel .fill {
-  background-color: #287fc7;
+  background-color: #625bd8;
   background-image:
     linear-gradient(90deg, rgba(255, 255, 255, 0.16) 50%, transparent 50%),
-    linear-gradient(rgba(255, 255, 255, 0.12) 50%, rgba(0, 39, 86, 0.16) 50%);
+    linear-gradient(rgba(255, 255, 255, 0.12) 50%, rgba(35, 24, 104, 0.2) 50%);
   background-size: 6px 6px;
   box-shadow: inset -2px 0 0 rgba(255, 255, 255, 0.2);
 }
 
 .capsule-pixel .fill--red {
-  background-color: #dd4f5e;
+  background-color: #e4516f;
   background-image:
     linear-gradient(90deg, rgba(255, 255, 255, 0.17) 50%, transparent 50%),
     linear-gradient(rgba(255, 255, 255, 0.11) 50%, rgba(91, 0, 20, 0.17) 50%);
@@ -1055,14 +1080,22 @@ body {
 }
 
 .num {
-  position: relative;
+  position: absolute;
   z-index: 5;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  box-sizing: border-box;
   font-size: var(--num-size, 13px);
   font-weight: 750;
   color: #f8fafc;
   letter-spacing: -0.2px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
   transition: transform 0.18s ease, opacity 0.15s ease;
 }
 
@@ -1597,10 +1630,10 @@ body {
 
 .resize-handle {
   position: absolute;
-  right: 2px;
+  left: 2px;
   bottom: 2px;
-  width: 20px; height: 20px; cursor: se-resize;
-  background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.25) 50%);
+  width: 20px; height: 20px; cursor: nesw-resize;
+  background: linear-gradient(225deg, transparent 50%, rgba(255,255,255,0.25) 50%);
 }
 
 html[data-ui-theme="light"] .panel {
@@ -1655,5 +1688,5 @@ html[data-ui-theme="light"] .shortcut-input:focus { background: #f7f7f6; border-
 html[data-ui-theme="light"] .panel-foot { background: rgba(20, 28, 42, 0.025); }
 html[data-ui-theme="light"] .kpi-val { color: #1d2433; }
 html[data-ui-theme="light"] .panel-body::-webkit-scrollbar-thumb { background: rgba(20, 28, 42, 0.18); }
-html[data-ui-theme="light"] .resize-handle { background: linear-gradient(135deg, transparent 50%, rgba(20, 28, 42, 0.2) 50%); }
+html[data-ui-theme="light"] .resize-handle { background: linear-gradient(225deg, transparent 50%, rgba(20, 28, 42, 0.2) 50%); }
 </style>

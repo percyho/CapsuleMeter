@@ -25,6 +25,7 @@ const en: Record<string, string> = {
   "窗口置顶": "Always on top",
   "贴边吸附": "Snap to edges",
   "显示模式": "Display mode",
+  "显示用量数值": "Show usage values",
   "剩余": "Remaining",
   "已用": "Used",
   "重置显示时长": "Reset-time display",
