@@ -1,90 +1,108 @@
-# CodexCapsule — Codex 用量胶囊小组件
+# CodexCapsule — Codex Usage Capsule
 
-一个 100×30 的桌面胶囊小部件，实时显示本机 **Codex CLI**（ChatGPT 账号登录）的用量剩余情况。
+**English** | [中文](中文文档.md)
 
-## 功能
+[![Vue 3](https://img.shields.io/badge/Vue-3-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white)](https://vite.dev/)
+[![Tauri](https://img.shields.io/badge/Tauri-2-24c8db?logo=tauri&logoColor=white)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-2021-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-- **胶囊窗口**：100×30 无边框一体式胶囊，左右分别显示 5 小时与每周额度
-- **整窗拖动**：按住窗口任意位置即可拖动；拖动结束时自动**贴边吸附**（靠近屏幕四边/四角自动吸附到边缘，避开任务栏），重启后记住位置
-- **左侧**：5 小时窗口剩余用量百分比，蓝色进度填充
-- **右侧**：周窗口剩余用量百分比，珊瑚红进度填充
-- **点击左侧**：临时显示 5 小时窗口重置的准确时间（如 `20:17`，跨天自动带日期如 `9/21 02:00`），5 秒后自动恢复
-- **点击右侧**：临时显示周窗口重置的准确时间，5 秒后自动恢复
-- **右键设置面板**：右键点击胶囊弹出设置面板（默认 300×225，右下角可拖拽调整大小）
-  - **界面主题**：明亮、暗黑或跟随系统
-  - **界面语言**：中文或 English，切换后即时生效并自动保存
-  - **胶囊主题**：带高光和立体层次的仿真主题，或方格颗粒构成的像素主题
-  - **透明度**：滑块实时调整整体透明度
-  - **字号**：滑块调整数字大小
-  - 所有设置自动保存，重启保留
-- **自动刷新**：每 5 分钟从 OpenAI 后端重新拉取一次用量
-- **用量历史**：额度与 Token 趋势、保留周期、刷新、清除和 CSV 导出
-- **限额重置**：显示可用重置次数与到期时间，经二次确认后重置每周和 5 小时限额
-- **桌面集成**：开机自启、系统托盘、低额度通知及 `Ctrl+Shift+U` 全局显隐快捷键；托盘可切换 Logo 或动态双层用量环
-- **维护工具**：一键重新登录、运行 Codex 诊断、检查 Gitee Release 更新
+A compact 100×30 desktop widget that displays the remaining usage for the locally authenticated **Codex CLI** ChatGPT account.
 
-## 技术栈
+## Features
 
-- **前端**：Vue 3 + TypeScript + Vite
-- **桌面框架**：Tauri 2（Rust）
-- **数据来源**：本机 `~/.codex/auth.json` 中的 ChatGPT 登录凭据，调用
-  `https://chatgpt.com/backend-api/wham/usage` 获取用量（与 Codex CLI `/status` 同源）
+- **Capsule window**: A frameless 100×30 capsule showing the 5-hour and weekly usage windows side by side.
+- **Window dragging**: Drag the capsule to reposition it. It automatically snaps to screen edges and corners while avoiding the taskbar, and restores its position after restart.
+- **Left side**: Shows the remaining percentage for the 5-hour window with an indigo gradient fill.
+- **Right side**: Shows the remaining percentage for the weekly window with a coral-to-rose gradient fill.
+- **Click the left side**: Temporarily shows the exact 5-hour reset time, such as `20:17` or `9/21 02:00` when it crosses into another day, then restores the percentage after five seconds.
+- **Click the right side**: Temporarily shows the exact weekly reset time, then restores the percentage after five seconds.
+- **Settings panel**: Right-click the capsule to open the settings panel, which defaults to 360×380.
+  - Drag the panel header to move the window.
+  - Drag the lower-left corner to resize the panel freely. The size is saved automatically.
+  - **Interface theme**: Light, dark, or system theme.
+  - **Language**: Switch instantly between Chinese and English.
+  - **Capsule theme**: Choose a realistic theme with highlights and depth or a pixel theme with block-style particles.
+  - **Opacity**: Adjust the window opacity in real time.
+  - **Text size**: Adjust the usage value font size.
+  - **Show usage values**: Hide both usage values and temporary reset times while keeping the progress fills visible.
+  - **Show capsule**: Hide the capsule and restore it later from the tray or with the global shortcut.
+  - All settings are saved automatically and restored after restart.
+- **Automatic refresh**: Fetches updated usage from the OpenAI backend every five minutes by default.
+- **Usage history**: Includes quota and token trends, retention settings, manual refresh, clearing, and CSV export.
+- **Usage reset credits**: Shows available reset credits and expiration details, with a two-step confirmation before resetting both weekly and 5-hour limits.
+- **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. The tray icon can use the app logo or dynamic dual usage rings.
+- **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default. A new key combination can be recorded directly in System settings.
+- **Account information**: Shows the current Codex account below the plan name. The value is read only from local Codex authentication data.
+- **Maintenance tools**: Re-authenticate, run Codex diagnostics, and check Gitee Releases for updates.
 
-## 数据说明
+## Technology
 
-| 数据项 | 来源 |
+- **Frontend**: Vue 3, TypeScript, and Vite
+- **Desktop framework**: Tauri 2 and Rust
+- **Data source**: ChatGPT credentials stored in the local `~/.codex/auth.json` file. Usage is fetched from `https://chatgpt.com/backend-api/wham/usage`, the same source used by Codex CLI `/status`.
+
+## Data Details
+
+| Data | Source |
 |---|---|
-| 5 小时剩余百分比 | `primary_window.used_percent`，剩余 = 100 − 已用 |
-| 周剩余百分比 | `secondary_window.used_percent`，剩余 = 100 − 已用 |
-| 重置时间 | `reset_at`（Unix 时间戳） |
+| Remaining 5-hour percentage | `primary_window.used_percent`; remaining = 100 − used |
+| Remaining weekly percentage | `secondary_window.used_percent`; remaining = 100 − used |
+| Reset time | `reset_at` Unix timestamp |
 
-- 凭据仅在本机 Rust 后端使用，**不会**发送到前端或第三方。
-- 若登录过期（HTTP 401），窗口会显示错误提示，运行 `codex login` 或打开一次 Codex 应用即可刷新登录。
-- 贴边吸附基于 Windows 显示器工作区（自动避开任务栏），阈值 24 逻辑像素。
+- Access, refresh, and ID tokens are used only by the local Rust backend and are **never** exposed to the frontend or a third party. Only the account email extracted locally from the ID token is returned for display in the settings panel.
+- If authentication expires with HTTP 401, run `codex login` or open the Codex app once to refresh the session.
+- Edge snapping uses the Windows monitor work area, automatically avoids the taskbar, and uses a threshold of 24 logical pixels.
 
-## 常用命令
+## Common Commands
 
 ```bash
-# 安装依赖
+# Install dependencies
 pnpm install
 
-# 开发模式（热更新）
+# Development mode with hot reload
 pnpm tauri dev
 
-# 打包（自动自增版本号）
-pnpm build:patch   # 修小 bug: 1.0.0 → 1.0.1
-pnpm build:minor   # 加新功能: 1.0.0 → 1.1.0
-pnpm build:major   # 大版本: 1.0.0 → 2.0.0
+# Build and automatically increment the version
+pnpm build:patch   # Bug fix: 1.0.0 → 1.0.1
+pnpm build:minor   # New feature: 1.0.0 → 1.1.0
+pnpm build:major   # Major release: 1.0.0 → 2.0.0
 
-# 仅自增版本号不打包
-node scripts/bump-version.js patch   # 或 minor / major
+# Increment the version without building
+node scripts/bump-version.js patch   # Or minor / major
 ```
 
-## 产物路径
+## Build Outputs
 
-```
-可执行文件:  src-tauri/target/release/codex-capsule.exe
-安装包:      src-tauri/target/release/bundle/nsis/CodexCapsule_<版本>_x64-setup.exe
+```text
+Executable:  src-tauri/target/release/codex-capsule.exe
+Installer:   src-tauri/target/release/bundle/nsis/CodexCapsule_<version>_x64-setup.exe
 ```
 
-## 项目结构
+## Project Structure
 
-```
+```text
 codexcApsule/
-├── src/                    # Vue3 前端
-│   └── App.vue             # 胶囊 UI + 右键设置面板（主题/透明度/字号）
+├── src/                    # Vue 3 frontend
+│   ├── App.vue             # Capsule window and settings panel
+│   ├── components/         # Statistics, reset credits, and shared UI components
+│   ├── composables/        # Theme, locale, history, and global-shortcut logic
+│   ├── types/              # Frontend data types
+│   └── views/              # Usage history window
 ├── src-tauri/
-│   ├── capabilities/       # Tauri 权限配置
-│   ├── icons/              # 应用图标
+│   ├── capabilities/       # Tauri permissions
+│   ├── icons/              # Application icons
 │   ├── src/
-│   │   ├── usage.rs        # 读取 auth + 调用用量 API
-│   │   ├── window_pos.rs   # 窗口位置记忆
-│   │   └── lib.rs          # 应用入口
-│   └── tauri.conf.json     # 窗口配置（100×30、无边框、置顶）
+│   │   ├── usage.rs        # Reads authentication and requests usage data
+│   │   ├── window_pos.rs   # Window-position persistence
+│   │   └── lib.rs          # Application entry point
+│   └── tauri.conf.json     # Window configuration
 ```
 
-## 已知限制
+## Known Limitations
 
-- 依赖本机 `~/.codex/auth.json`，未登录 Codex 时无法获取数据。
-- 登录过期后可在“系统 → 诊断与更新”中启动 `codex login`，完成后点击立即刷新。
-- 更新检查会查询 Gitee Release；应用不会在后台自动下载或安装更新。
+- A local `~/.codex/auth.json` file is required. Usage cannot be loaded until Codex is authenticated.
+- When authentication expires, use **System → Diagnostics & updates** to start `codex login`, then refresh the usage data.
+- Update checks query Gitee Releases. The application never downloads or installs updates automatically in the background.
