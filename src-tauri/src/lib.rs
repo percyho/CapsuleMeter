@@ -1,3 +1,4 @@
+mod reset_credits;
 mod usage;
 mod window_pos;
 use serde::Serialize;
@@ -200,6 +201,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             usage::fetch_usage,
             usage::fetch_analytics,
+            reset_credits::fetch_reset_credits,
+            reset_credits::consume_reset_credit,
             window_pos::set_snap_enabled,
             open_history,
             write_history_csv,

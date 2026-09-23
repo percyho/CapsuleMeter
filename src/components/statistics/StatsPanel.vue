@@ -7,8 +7,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from "vue";
 import type { HistoryPoint } from "../../types/usage";
 import { compactNumber } from "../../utils/formatters";
+import { useLocale } from "../../composables/useLocale";
 
 use([BarChart, LineChart, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
+const { locale, t } = useLocale();
 
 interface DailyUsage {
   date?: string;
@@ -140,7 +142,7 @@ function renderChart() {
         splitLine: { lineStyle: { color: gridColor } },
       },
       series: points.length ? [{
-        name: "剩余额度",
+        name: t("剩余"),
         type: "line",
         data: points.map((point) => [point.time, point.value]),
         showSymbol: false,
@@ -152,7 +154,7 @@ function renderChart() {
         type: "text",
         left: "center",
         top: "middle",
-        style: { text: "还没有记录额度历史", fill: textColor, fontSize: 11 },
+        style: { text: t("还没有记录额度历史"), fill: textColor, fontSize: 11 },
       }],
     }, { notMerge: true });
     return;
@@ -186,12 +188,12 @@ function renderChart() {
       type: "text",
       left: "center",
       top: "middle",
-      style: { text: error.value || "还没有记录 Token 活动", fill: textColor, fontSize: 11 },
+      style: { text: error.value || t("还没有记录 Token 活动"), fill: textColor, fontSize: 11 },
     }],
   }, { notMerge: true });
 }
 
-watch([activeView, quotaWindow, quotaRange, () => props.historyPoints, () => props.uiTheme], async () => {
+watch([activeView, quotaWindow, quotaRange, () => props.historyPoints, () => props.uiTheme, locale], async () => {
   await nextTick();
   scheduleRender();
 });
@@ -220,49 +222,49 @@ onBeforeUnmount(() => {
 <template>
   <section class="stats-panel">
     <div class="stats-header">
-      <div class="view-tabs" role="tablist" aria-label="统计类型">
-        <button :class="{ active: activeView === 'quota' }" role="tab" :aria-selected="activeView === 'quota'" @click="activeView = 'quota'">额度历史</button>
-        <button :class="{ active: activeView === 'tokens' }" role="tab" :aria-selected="activeView === 'tokens'" @click="activeView = 'tokens'">Token 活动</button>
+      <div class="view-tabs" role="tablist" :aria-label="t('统计')">
+        <button :class="{ active: activeView === 'quota' }" role="tab" :aria-selected="activeView === 'quota'" @click="activeView = 'quota'">{{ t("额度历史") }}</button>
+        <button :class="{ active: activeView === 'tokens' }" role="tab" :aria-selected="activeView === 'tokens'" @click="activeView = 'tokens'">{{ t("Token 活动") }}</button>
       </div>
-      <button class="detail-button" @click="emit('openHistory')">详细历史 ↗</button>
+      <button class="detail-button" @click="emit('openHistory')">{{ t("详细历史 ↗") }}</button>
     </div>
 
     <template v-if="activeView === 'quota'">
       <div class="control-row">
         <div class="segmented" aria-label="额度窗口">
-          <button :class="{ active: quotaWindow === 'fiveHour' }" @click="quotaWindow = 'fiveHour'">5 小时</button>
-          <button :class="{ active: quotaWindow === 'weekly' }" @click="quotaWindow = 'weekly'">每周</button>
+          <button :class="{ active: quotaWindow === 'fiveHour' }" @click="quotaWindow = 'fiveHour'">{{ t("5 小时") }}</button>
+          <button :class="{ active: quotaWindow === 'weekly' }" @click="quotaWindow = 'weekly'">{{ t("每周") }}</button>
         </div>
         <div class="segmented range-segmented" aria-label="额度范围">
-          <button v-for="days in ([1, 7, 14, 30] as QuotaRange[])" :key="days" :class="{ active: quotaRange === days }" @click="quotaRange = days">{{ days === 1 ? '当前' : `${days}天` }}</button>
+          <button v-for="days in ([1, 7, 14, 30] as QuotaRange[])" :key="days" :class="{ active: quotaRange === days }" @click="quotaRange = days">{{ days === 1 ? t('当前') : (locale === 'en-US' ? `${days}d` : `${days}天`) }}</button>
         </div>
       </div>
       <div class="metric-grid">
-        <div class="metric"><strong>{{ quotaStats ? `${Math.round(quotaStats.current)}%` : '—' }}</strong><span>当前剩余</span></div>
-        <div class="metric"><strong>{{ quotaStats ? `${Math.round(quotaStats.lowest)}%` : '—' }}</strong><span>最低剩余</span></div>
-        <div class="metric"><strong>{{ quotaStats?.samples ?? 0 }}</strong><span>采样点数</span></div>
-        <div class="metric"><strong>{{ quotaStats ? `${quotaStats.span.toFixed(1)}h` : '—' }}</strong><span>记录跨度</span></div>
+        <div class="metric"><strong>{{ quotaStats ? `${Math.round(quotaStats.current)}%` : '—' }}</strong><span>{{ t("当前剩余") }}</span></div>
+        <div class="metric"><strong>{{ quotaStats ? `${Math.round(quotaStats.lowest)}%` : '—' }}</strong><span>{{ t("最低剩余") }}</span></div>
+        <div class="metric"><strong>{{ quotaStats?.samples ?? 0 }}</strong><span>{{ t("采样点数") }}</span></div>
+        <div class="metric"><strong>{{ quotaStats ? `${quotaStats.span.toFixed(1)}h` : '—' }}</strong><span>{{ t("记录跨度") }}</span></div>
       </div>
     </template>
 
     <template v-else>
       <div class="control-row">
         <div class="segmented token-ranges" aria-label="Token 时间范围">
-          <button v-for="option in ([7, 30, 90, 365, 3650] as TokenRange[])" :key="option" :class="{ active: tokenRange === option }" @click="tokenRange = option">{{ option === 3650 ? '全部' : option === 365 ? '1年' : `${option}天` }}</button>
+          <button v-for="option in ([7, 30, 90, 365, 3650] as TokenRange[])" :key="option" :class="{ active: tokenRange === option }" @click="tokenRange = option">{{ option === 3650 ? t('全部') : option === 365 ? (locale === 'en-US' ? '1y' : '1年') : (locale === 'en-US' ? `${option}d` : `${option}天`) }}</button>
         </div>
-        <span v-if="loading" class="status-text">加载中…</span>
-        <span v-else-if="error" class="status-text error" :title="error">Token 活动不可用</span>
+        <span v-if="loading" class="status-text">{{ t("加载中…") }}</span>
+        <span v-else-if="error" class="status-text error" :title="error">{{ t("Token 活动不可用") }}</span>
       </div>
       <div class="metric-grid">
-        <div class="metric"><strong>{{ tokenStats ? compactNumber(tokenStats.total) : '—' }}</strong><span>本范围总量</span></div>
-        <div class="metric"><strong>{{ tokenStats ? compactNumber(tokenStats.peak) : '—' }}</strong><span>本范围峰值</span></div>
-        <div class="metric"><strong>{{ tokenStats ? compactNumber(tokenStats.average) : '—' }}</strong><span>日均</span></div>
-        <div class="metric"><strong>{{ tokenStats?.activeDays ?? 0 }}</strong><span>活跃天数</span></div>
+        <div class="metric"><strong>{{ tokenStats ? compactNumber(tokenStats.total) : '—' }}</strong><span>{{ t("本范围总量") }}</span></div>
+        <div class="metric"><strong>{{ tokenStats ? compactNumber(tokenStats.peak) : '—' }}</strong><span>{{ t("本范围峰值") }}</span></div>
+        <div class="metric"><strong>{{ tokenStats ? compactNumber(tokenStats.average) : '—' }}</strong><span>{{ t("日均") }}</span></div>
+        <div class="metric"><strong>{{ tokenStats?.activeDays ?? 0 }}</strong><span>{{ t("活跃天数") }}</span></div>
       </div>
     </template>
 
-    <div ref="chart" class="stats-chart" role="img" :aria-label="activeView === 'quota' ? '额度历史趋势图' : 'Token 活动柱状图'"></div>
-    <p class="privacy-note">数据保存在本机，统计图不会上传历史记录。</p>
+    <div ref="chart" class="stats-chart" role="img" :aria-label="activeView === 'quota' ? t('额度历史') : t('Token 活动')"></div>
+    <p class="privacy-note">{{ t("数据保存在本机，统计图不会上传历史记录。") }}</p>
   </section>
 </template>
 

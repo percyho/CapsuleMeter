@@ -11,9 +11,16 @@ import {
   isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
 import StatsPanel from "./components/statistics/StatsPanel.vue";
+import ResetCreditsCard from "./components/usage/ResetCreditsCard.vue";
 import { useUiTheme } from "./composables/useUiTheme";
+import { useLocale } from "./composables/useLocale";
 import { useUsageHistory } from "./composables/useUsageHistory";
-import type { UsageData, WindowData } from "./types/usage";
+import type {
+  ConsumeResetResult,
+  ResetCreditsSummary,
+  UsageData,
+  WindowData,
+} from "./types/usage";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
@@ -60,6 +67,10 @@ const usage = ref<UsageData | null>(null);
 const loading = ref(false);
 const lastError = ref<string | null>(null);
 const lastRefresh = ref("--");
+const resetCredits = ref<ResetCreditsSummary | null>(null);
+const resetCreditsLoading = ref(false);
+const resetCreditsError = ref<string | null>(null);
+let pendingResetKey: string | null = null;
 
 // 当前左侧/右侧是否正在显示重置时间
 const showLeftReset = ref(false);
@@ -73,6 +84,7 @@ const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
 type CapsuleStyle = "solid" | "beads";
 const capsuleStyle = ref<CapsuleStyle>(localStorage.getItem("capsuleStyle") === "beads" ? "beads" : "solid");
 const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
+const { locale, setLocale, t } = useLocale();
 const activeTab = ref("appearance");
 const { historyPoints, appendUsage } = useUsageHistory({ syncAcrossWindows: true });
 function recordHistory() {
@@ -230,6 +242,48 @@ async function refresh() {
   }
   lastRefresh.value = new Date().toLocaleTimeString("zh-CN", { hour12: false });
   recordHistory();
+  void refreshResetCredits();
+}
+
+async function refreshResetCredits() {
+  if (resetCreditsLoading.value) return;
+  resetCreditsLoading.value = true;
+  resetCreditsError.value = null;
+  try {
+    resetCredits.value = await invoke<ResetCreditsSummary>("fetch_reset_credits");
+  } catch (reason) {
+    resetCreditsError.value = String(reason);
+  } finally {
+    resetCreditsLoading.value = false;
+  }
+}
+
+async function consumeResetCredit(creditId: string | null) {
+  if (resetCreditsLoading.value) return;
+  resetCreditsLoading.value = true;
+  resetCreditsError.value = null;
+  pendingResetKey ??= crypto.randomUUID();
+  try {
+    const result = await invoke<ConsumeResetResult>("consume_reset_credit", {
+      idempotencyKey: pendingResetKey,
+      creditId,
+    });
+    if (result.outcome === "reset" || result.outcome === "alreadyRedeemed") {
+      pendingResetKey = null;
+      systemMessage.value = "限额已重置，用量数据已更新";
+    } else if (result.outcome === "nothingToReset") {
+      pendingResetKey = null;
+      systemMessage.value = "当前限额尚未达到可重置条件";
+    } else {
+      pendingResetKey = null;
+      systemMessage.value = "当前没有可用的限额重置机会";
+    }
+  } catch (reason) {
+    resetCreditsError.value = `${String(reason)}；再次确认将安全重试本次操作`;
+  } finally {
+    resetCreditsLoading.value = false;
+  }
+  await refresh();
 }
 
 let interval: number | undefined;
@@ -335,7 +389,7 @@ async function checkForUpdates() {
 
 function onTabKeydown(event: KeyboardEvent) {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  const tabs = ["appearance", "behavior", "stats", "system"];
+  const tabs = ["appearance", "behavior", "stats", "reset", "system"];
   const current = tabs.indexOf(activeTab.value);
   const next = (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
   activeTab.value = tabs[next];
@@ -489,6 +543,7 @@ function resetDefaults() {
   fontSize.value = 13;
   capsuleStyle.value = "solid";
   uiTheme.value = "dark";
+  setLocale("zh-CN");
   alwaysOnTop.value = true;
   snapEnabled.value = true;
   displayMode.value = "remaining";
@@ -501,7 +556,7 @@ function resetDefaults() {
   trayIconMode.value = "logo";
   panelW.value = PANEL_DEFAULT_WIDTH;
   panelH.value = PANEL_DEFAULT_HEIGHT;
-  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "shortcutEnabled", "trayIconMode", "panelW", "panelH"].forEach((k) =>
+  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "appLocale", "alwaysOnTop", "snapEnabled", "displayMode", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "shortcutEnabled", "trayIconMode", "panelW", "panelH"].forEach((k) =>
     localStorage.removeItem(k)
   );
   applyWindowSettings();
@@ -522,9 +577,11 @@ onMounted(() => {
   initAutostart();
   refresh();
   restartInterval();
-  void applyGlobalShortcut();
+  void applyGlobalShortcut().catch((reason) => {
+    shortcutEnabled.value = false;
+    systemMessage.value = `快捷键注册失败：${String(reason)}`;
+  });
   void updateTrayIcon();
-  void applyGlobalShortcut();
   void listen("tray-refresh", () => void refresh()).then(unlisten => unlistenEvents.push(unlisten));
   void listen("tray-open-settings", () => { if (!showPanel.value) void togglePanel(); }).then(unlisten => unlistenEvents.push(unlisten));
   void getCurrentWindow().onFocusChanged(({ payload }) => {
@@ -556,37 +613,46 @@ onBeforeUnmount(() => {
   <div v-if="showPanel" class="panel" :class='{ "align-right": panelAlignRight }' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
     <div class="panel-head">
       <div class="panel-heading">
-        <span class="panel-title">设置</span>
-        <span class="panel-description">个性化用量胶囊</span>
+        <span class="panel-title">{{ t("设置") }}</span>
+        <span class="panel-description">{{ t("个性化用量胶囊") }}</span>
       </div>
-      <span class="panel-sub">{{ lastError ? "数据异常" : (usage?.plan || "未登录").toUpperCase() }}</span>
-      <button class="panel-close" title="关闭" aria-label="关闭设置" @click="togglePanel()">×</button>
+      <span class="panel-sub">{{ lastError ? t("数据异常") : (usage?.plan || t("未登录")).toUpperCase() }}</span>
+      <button class="panel-close" :title="t('关闭设置')" :aria-label="t('关闭设置')" @click="togglePanel()">×</button>
     </div>
 
-    <div class="tabs" role="tablist" aria-label="设置分类" @keydown="onTabKeydown">
-      <button class="tab" :class="{ on: activeTab==='appearance' }" role="tab" :aria-selected="activeTab==='appearance'" @click="activeTab='appearance'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10h-10V2z"/><path d="M12 12l9.3-9.3"/><path d="M12 12l-6 6"/></svg><span>外观</span></button>
-      <button class="tab" :class="{ on: activeTab==='behavior' }" role="tab" :aria-selected="activeTab==='behavior'" @click="activeTab='behavior'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>行为</span></button>
-      <button class="tab" :class="{ on: activeTab==='stats' }" role="tab" :aria-selected="activeTab==='stats'" @click="activeTab='stats'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span>统计</span></button>
-      <button class="tab" :class="{ on: activeTab==='system' }" role="tab" :aria-selected="activeTab==='system'" @click="activeTab='system'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>系统</span></button>
-    </div>
+    <div class="settings-shell">
+      <div class="tabs" role="tablist" :aria-label="t('设置分类')" @keydown="onTabKeydown">
+        <button class="tab" :class="{ on: activeTab==='appearance' }" role="tab" :aria-selected="activeTab==='appearance'" @click="activeTab='appearance'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg><span>{{ t("外观") }}</span></button>
+        <button class="tab" :class="{ on: activeTab==='behavior' }" role="tab" :aria-selected="activeTab==='behavior'" @click="activeTab='behavior'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg><span>{{ t("行为") }}</span></button>
+        <button class="tab" :class="{ on: activeTab==='stats' }" role="tab" :aria-selected="activeTab==='stats'" @click="activeTab='stats'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>{{ t("统计") }}</span></button>
+        <button class="tab" :class="{ on: activeTab==='reset' }" role="tab" :aria-selected="activeTab==='reset'" @click="activeTab='reset'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-7a5 5 0 1 0 4.6 7"/><path d="m17 3 3 4-3 4"/></svg><span>{{ t("重置") }}</span></button>
+        <button class="tab" :class="{ on: activeTab==='system' }" role="tab" :aria-selected="activeTab==='system'" @click="activeTab='system'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>{{ t("系统") }}</span></button>
+      </div>
 
-    <div class="panel-body">
+      <div class="panel-body">
       <template v-if="activeTab==='appearance'">
       <div class="row">
-        <span class="row-name">界面主题</span>
+        <span class="row-name">{{ t("界面主题") }}</span>
         <div class="seg" aria-label="界面主题">
-          <button :class="{ on: uiTheme === 'light' }" @click="setUiTheme('light')">明亮</button>
-          <button :class="{ on: uiTheme === 'dark' }" @click="setUiTheme('dark')">暗黑</button>
-          <button :class="{ on: uiTheme === 'system' }" @click="setUiTheme('system')">系统</button>
+          <button :class="{ on: uiTheme === 'light' }" @click="setUiTheme('light')">{{ t("明亮") }}</button>
+          <button :class="{ on: uiTheme === 'dark' }" @click="setUiTheme('dark')">{{ t("暗黑") }}</button>
+          <button :class="{ on: uiTheme === 'system' }" @click="setUiTheme('system')">{{ t("跟随系统") }}</button>
         </div>
       </div>
       <div class="row">
-        <span class="row-name">透明度</span>
+        <span class="row-name">{{ t("语言") }}</span>
+        <div class="seg" aria-label="Language">
+          <button :class="{ on: locale === 'zh-CN' }" @click="setLocale('zh-CN')">中文</button>
+          <button :class="{ on: locale === 'en-US' }" @click="setLocale('en-US')">English</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="row-name">{{ t("透明度") }}</span>
         <input type="range" min="0.3" max="1" step="0.05" v-model.number="opacity" @input="onOpacityChange" />
         <span class="row-val">{{ Math.round(opacity * 100) }}%</span>
       </div>
       <div class="row">
-        <span class="row-name">字号</span>
+        <span class="row-name">{{ t("字号") }}</span>
         <input type="range" min="9" max="20" step="1" v-model.number="fontSize" @input="onFontSizeChange" />
         <span class="row-val">{{ fontSize }}px</span>
       </div>
@@ -594,63 +660,56 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-if="activeTab==='behavior'">
-      <div class="group-label">行为</div>
+      <div class="group-label">{{ t("行为") }}</div>
       <div class="row">
-        <span class="row-name">窗口置顶</span>
+        <span class="row-name">{{ t("窗口置顶") }}</span>
         <button class="switch" :class="{ on: alwaysOnTop }" @click="alwaysOnTop = !alwaysOnTop; onAlwaysOnTopChange()">
           <span class="knob"></span>
         </button>
       </div>
       <div class="row">
-        <span class="row-name">贴边吸附</span>
+        <span class="row-name">{{ t("贴边吸附") }}</span>
         <button class="switch" :class="{ on: snapEnabled }" @click="snapEnabled = !snapEnabled; onSnapChange()">
           <span class="knob"></span>
         </button>
       </div>
       <div class="row">
-        <span class="row-name">显示模式</span>
+        <span class="row-name">{{ t("显示模式") }}</span>
         <div class="seg">
-          <button :class="{ on: displayMode === 'remaining' }" @click="displayMode = 'remaining'; onDisplayModeChange()">剩余</button>
-          <button :class="{ on: displayMode === 'used' }" @click="displayMode = 'used'; onDisplayModeChange()">已用</button>
+          <button :class="{ on: displayMode === 'remaining' }" @click="displayMode = 'remaining'; onDisplayModeChange()">{{ t("剩余") }}</button>
+          <button :class="{ on: displayMode === 'used' }" @click="displayMode = 'used'; onDisplayModeChange()">{{ t("已用") }}</button>
         </div>
       </div>
       <div class="row">
-        <span class="row-name">重置显示时长</span>
+        <span class="row-name">{{ t("重置显示时长") }}</span>
         <select v-model.number="resetShowSec" @change="onResetShowSecChange()">
-          <option :value="3">3 秒</option>
-          <option :value="5">5 秒</option>
-          <option :value="8">8 秒</option>
-          <option :value="10">10 秒</option>
+          <option v-for="seconds in [3, 5, 8, 10]" :key="seconds" :value="seconds">{{ locale === "en-US" ? `${seconds} sec` : `${seconds} 秒` }}</option>
         </select>
       </div>
 
-      <div class="group-label">数据</div>
+      <div class="group-label">{{ t("数据") }}</div>
       <div class="row">
-        <span class="row-name">自动刷新</span>
+        <span class="row-name">{{ t("自动刷新") }}</span>
         <select v-model.number="refreshMin">
-          <option :value="1">1 分钟</option>
-          <option :value="2">2 分钟</option>
-          <option :value="5">5 分钟</option>
-          <option :value="10">10 分钟</option>
-          <option :value="30">30 分钟</option>
+          <option v-for="minutes in [1, 2, 5, 10, 30]" :key="minutes" :value="minutes">{{ locale === "en-US" ? `${minutes} min` : `${minutes} 分钟` }}</option>
         </select>
       </div>
       <div class="row">
-        <span class="row-name">上次刷新</span>
+        <span class="row-name">{{ t("上次刷新") }}</span>
         <span class="row-val">{{ lastRefresh }}</span>
-        <button class="btn-mini" :disabled="loading" @click="refresh()">{{ loading ? "刷新中…" : "立即刷新" }}</button>
+        <button class="btn-mini" :disabled="loading" @click="refresh()">{{ loading ? t("刷新中…") : t("立即刷新") }}</button>
       </div>
       <div class="row">
-        <span class="row-name">胶囊填充</span>
+        <span class="row-name">{{ t("胶囊填充") }}</span>
         <div class="seg" aria-label="胶囊填充主题">
-          <button :class="{ on: capsuleStyle === 'solid' }" @click="setCapsuleStyle('solid')">纯色</button>
-          <button :class="{ on: capsuleStyle === 'beads' }" @click="setCapsuleStyle('beads')">小药丸</button>
+          <button :class="{ on: capsuleStyle === 'solid' }" @click="setCapsuleStyle('solid')">{{ t("纯色") }}</button>
+          <button :class="{ on: capsuleStyle === 'beads' }" @click="setCapsuleStyle('beads')">{{ t("小药丸") }}</button>
         </div>
       </div>
       <div class="row">
-        <span class="row-name">历史保留</span>
+        <span class="row-name">{{ t("历史保留") }}</span>
         <select v-model.number="historyRetentionDays" @change="onRetentionChange">
-          <option :value="7">7 天</option><option :value="30">30 天</option><option :value="90">90 天</option><option :value="365">1 年</option>
+          <option v-for="days in [7, 30, 90, 365]" :key="days" :value="days">{{ days === 365 ? (locale === "en-US" ? "1 year" : "1 年") : (locale === "en-US" ? `${days} days` : `${days} 天`) }}</option>
         </select>
       </div>
 
@@ -660,68 +719,76 @@ onBeforeUnmount(() => {
         <StatsPanel :history-points="historyPoints" :ui-theme="uiTheme" @open-history="invoke('open_history')" />
       </template>
 
+      <template v-if="activeTab==='reset'">
+        <div class="group-label">{{ t("限额重置") }}</div>
+        <ResetCreditsCard
+          :summary="resetCredits"
+          :loading="resetCreditsLoading"
+          :error="resetCreditsError"
+          @refresh="refreshResetCredits"
+          @consume="consumeResetCredit"
+        />
+      </template>
+
       <template v-if="activeTab==='system'">
-      <div class="group-label">系统</div>
+      <div class="group-label">{{ t("系统") }}</div>
       <div class="row row-flat">
-        <span class="row-name">开机自启</span>
+        <span class="row-name">{{ t("开机自启") }}</span>
         <button class="switch" :class="{ on: autostart }" @click="autostart = !autostart; onAutostartChange()">
           <span class="knob"></span>
         </button>
       </div>
       <div class="row row-flat">
-        <span class="row-name">托盘图标</span>
+        <span class="row-name">{{ t("托盘图标") }}</span>
         <div class="seg" aria-label="托盘图标样式">
           <button :class="{ on: trayIconMode === 'logo' }" @click="onTrayIconModeChange('logo')">Logo</button>
-          <button :class="{ on: trayIconMode === 'usage' }" @click="onTrayIconModeChange('usage')">用量环</button>
+          <button :class="{ on: trayIconMode === 'usage' }" @click="onTrayIconModeChange('usage')">{{ t("用量环") }}</button>
         </div>
       </div>
 
       <div class="row row-flat">
-        <span class="row-name">低额度通知</span>
+        <span class="row-name">{{ t("低额度通知") }}</span>
         <button class="switch" :class="{ on: notificationsEnabled }" @click="notificationsEnabled = !notificationsEnabled; onNotificationChange()"><span class="knob"></span></button>
       </div>
       <div v-if="notificationsEnabled" class="row row-flat">
-        <span class="row-name">提醒阈值</span>
+        <span class="row-name">{{ t("提醒阈值") }}</span>
         <select v-model.number="notificationThreshold" @change="onNotificationThresholdChange"><option :value="10">10%</option><option :value="20">20%</option><option :value="30">30%</option></select>
       </div>
       <div class="row row-flat">
-        <span class="row-name">全局快捷键</span>
+        <span class="row-name">{{ t("全局快捷键") }}</span>
         <span class="row-val">Ctrl+Shift+U</span>
         <button class="switch" :class="{ on: shortcutEnabled }" @click="shortcutEnabled = !shortcutEnabled; onShortcutChange()"><span class="knob"></span></button>
       </div>
 
-      <div class="group-label">诊断与更新</div>
+      <div class="group-label">{{ t("诊断与更新") }}</div>
       <div class="row row-flat system-actions">
-        <button class="btn-mini" @click="startLogin">重新登录</button>
-        <button class="btn-mini" @click="runDiagnostics">连接诊断</button>
-        <button class="btn-mini" @click="checkForUpdates">检查更新</button>
+        <button class="btn-mini" @click="startLogin">{{ t("重新登录") }}</button>
+        <button class="btn-mini" @click="runDiagnostics">{{ t("连接诊断") }}</button>
+        <button class="btn-mini" @click="checkForUpdates">{{ t("检查更新") }}</button>
       </div>
       <p v-if="systemMessage" class="system-message">{{ systemMessage }}</p>
 
-      <div class="group-label">关于</div>
-      <div class="row row-flat"><span class="row-name">版本</span><span class="row-val">v1.0.0</span></div>
+      <div class="group-label">{{ t("关于") }}</div>
+      <div class="row row-flat"><span class="row-name">{{ t("版本") }}</span><span class="row-val">v1.0.0</span></div>
       <div class="row row-flat privacy-row">
         <div class="privacy-heading">
-          <span class="row-name">隐私</span>
-          <span class="privacy-badge">仅本地处理</span>
+          <span class="row-name">{{ t("隐私") }}</span>
+          <span class="privacy-badge">{{ t("仅本地处理") }}</span>
         </div>
-        <p class="privacy-summary">Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。</p>
+        <p class="privacy-summary">{{ t("Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。") }}</p>
         <ul class="privacy-list">
-          <li><strong>认证信息</strong><span>仅在本机读取 Codex 登录凭据；访问令牌不会显示在界面或写入历史记录。</span></li>
-          <li><strong>网络请求</strong><span>仅用于向 ChatGPT 官方接口获取额度与用量统计，不会发送给第三方服务。</span></li>
-          <li><strong>本地数据</strong><span>偏好设置和额度采样保存在本机，可通过“恢复默认”或“清除历史”删除。</span></li>
-          <li><strong>CSV 导出</strong><span>只有你主动选择保存位置时才会生成文件，应用不会自动上传导出内容。</span></li>
-          <li><strong>遥测</strong><span>应用不包含广告、用户追踪或后台遥测。</span></li>
+          <li v-for="item in [['认证信息','仅在本机读取 Codex 登录凭据；访问令牌不会显示在界面或写入历史记录。'],['网络请求','仅用于向 ChatGPT 官方接口获取额度与用量统计，不会发送给第三方服务。'],['本地数据','偏好设置和额度采样保存在本机，可通过“恢复默认”或“清除历史”删除。'],['CSV 导出','只有你主动选择保存位置时才会生成文件，应用不会自动上传导出内容。'],['遥测','应用不包含广告、用户追踪或后台遥测。']]" :key="item[0]"><strong>{{ t(item[0]) }}</strong><span>{{ t(item[1]) }}</span></li>
         </ul>
       </div>
-      <div class="row row-flat"><span class="row-name">许可证</span><span class="row-val">MIT</span></div>
+      <div class="row row-flat"><span class="row-name">{{ t("许可证") }}</span><span class="row-val">MIT</span></div>
       </template>
 
+      </div>
     </div>
 
     <div class="panel-foot">
-      <button class="btn-mini btn-secondary" @click="resetDefaults()">恢复默认</button>
-      <button class="btn-mini btn-danger" @click="onQuit()">退出应用</button>
+      <button class="btn-mini btn-secondary" @click="resetDefaults()">{{ t("恢复默认") }}</button>
+      <button class="btn-mini btn-danger" @click="onQuit()">{{ t("退出应用") }}</button>
     </div>
 
     <div class="resize-handle" @mousedown="onPanelResizeStart"></div>
@@ -939,8 +1006,8 @@ body {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  background: var(--panel-bg, rgba(24, 27, 35, 0.97));
-  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  background: var(--panel-bg, rgba(24, 24, 24, 0.98));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
   margin-top: 6px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -953,7 +1020,7 @@ body {
   align-items: center;
   gap: 10px;
   min-height: 56px;
-  padding: 10px 12px 9px 14px;
+  padding: 11px 13px 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
@@ -1006,47 +1073,52 @@ body {
   color: #fff;
 }
 
+.settings-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  flex-shrink: 0;
+  flex: 0 0 92px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .tab {
-  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
+  justify-content: flex-start;
+  gap: 8px;
   min-width: 0;
-  padding: 7px 5px;
+  padding: 8px 9px;
   border: none;
   background: transparent;
   color: var(--panel-val, #7f8799);
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
-  border-radius: 7px;
+  border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease;
 }
 
 .tab svg { flex-shrink: 0; }
 
-.tab:hover { background: rgba(255, 255, 255, 0.05); }
+.tab:hover { background: rgba(255, 255, 255, 0.055); }
 
 .tab.on {
-  background: var(--panel-bg-active, rgba(107, 138, 240, 0.15));
+  background: var(--panel-bg-active, rgba(255, 255, 255, 0.09));
   color: var(--panel-text, #fff);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(107, 138, 240, 0.2);
 }
 
 .panel-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 10px 12px 12px;
+  padding: 12px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1064,8 +1136,8 @@ body {
 .group-label {
   font-size: 9px;
   font-weight: 700;
-  color: var(--panel-accent, #7d98f5);
-  letter-spacing: 1.2px;
+  color: var(--panel-val, #8f8f8f);
+  letter-spacing: 0.08em;
   margin-top: 7px;
   padding: 7px 2px 2px;
   text-transform: uppercase;
@@ -1080,13 +1152,14 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 38px;
-  padding: 7px 9px;
+  min-height: 42px;
+  padding: 8px 2px;
   font-size: 11px;
   color: #d8dce6;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 0;
 }
 
 .row.row-flat {
@@ -1096,7 +1169,7 @@ body {
 }
 
 .row-name {
-  flex: 0 0 88px;
+  flex: 1 1 auto;
   color: var(--panel-text, #cfd4df);
   line-height: 1.35;
 }
@@ -1144,9 +1217,11 @@ body {
 }
 
 .switch.on {
-  background: #6b8af0;
-  border-color: #6b8af0;
+  background: #f1f1f1;
+  border-color: #f1f1f1;
 }
+
+.switch.on .knob { background: #181818; }
 
 .switch.on .knob {
   left: 16px;
@@ -1155,8 +1230,8 @@ body {
 /* 分段选择 */
 .seg {
   display: flex;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 7px;
   overflow: hidden;
   flex-shrink: 0;
   margin-left: auto;
@@ -1173,7 +1248,7 @@ body {
 }
 
 .seg button.on {
-  background: #6b8af0;
+  background: rgba(255, 255, 255, 0.13);
   color: #fff;
 }
 
@@ -1198,9 +1273,9 @@ body {
 
 /* 小按钮 */
 .btn-mini {
-  background: rgba(107, 138, 240, 0.16);
-  color: #8fa7f5;
-  border: 1px solid rgba(107, 138, 240, 0.35);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--panel-text, #ddd);
+  border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 6px;
   font-size: 10px;
   padding: 6px 10px;
@@ -1209,7 +1284,7 @@ body {
 }
 
 .btn-mini:hover {
-  background: rgba(107, 138, 240, 0.3);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
 
@@ -1359,13 +1434,13 @@ body {
 }
 
 html[data-ui-theme="light"] .panel {
-  --panel-bg: rgba(248, 249, 252, 0.98);
+  --panel-bg: rgba(250, 250, 249, 0.99);
   --panel-border: rgba(20, 28, 42, 0.12);
   --panel-title: #1d2433;
   --panel-text: #344054;
   --panel-val: #667085;
-  --panel-accent: #2563eb;
-  --panel-bg-active: rgba(37, 99, 235, 0.1);
+  --panel-accent: #1f2937;
+  --panel-bg-active: rgba(17, 24, 39, 0.07);
   box-shadow: 0 16px 40px rgba(16, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -1375,17 +1450,18 @@ html[data-ui-theme="light"] .panel-foot {
   border-color: rgba(20, 28, 42, 0.09);
 }
 
-html[data-ui-theme="light"] .row { color: #344054; background: transparent; border-color: transparent; }
+html[data-ui-theme="light"] .row { color: #344054; background: transparent; border-color: rgba(20, 28, 42, 0.07); }
 
 html[data-ui-theme="light"] .row.row-flat { background: transparent; border-color: transparent; }
 html[data-ui-theme="light"] .tab:hover { background: rgba(20, 28, 42, 0.05); }
 html[data-ui-theme="light"] .panel-close { color: #667085; }
 html[data-ui-theme="light"] .panel-close:hover { background: rgba(20, 28, 42, 0.08); color: #1d2433; }
 html[data-ui-theme="light"] .switch { background: rgba(20, 28, 42, 0.12); border-color: rgba(20, 28, 42, 0.16); }
-html[data-ui-theme="light"] .switch.on { background: #2563eb; border-color: #2563eb; }
+html[data-ui-theme="light"] .switch.on { background: #242424; border-color: #242424; }
+html[data-ui-theme="light"] .switch.on .knob { background: #fff; }
 html[data-ui-theme="light"] .seg { border-color: rgba(20, 28, 42, 0.18); }
 html[data-ui-theme="light"] .seg button { color: #667085; }
-html[data-ui-theme="light"] .seg button.on { background: #2563eb; color: #fff; }
+html[data-ui-theme="light"] .seg button.on { background: #242424; color: #fff; }
 html[data-ui-theme="light"] .panel select { background: #fff; color: #344054; border-color: rgba(20, 28, 42, 0.16); }
 html[data-ui-theme="light"] .panel select option { background: #fff; color: #344054; }
 html[data-ui-theme="light"] .panel-foot { background: rgba(20, 28, 42, 0.025); }

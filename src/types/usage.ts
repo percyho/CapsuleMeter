@@ -12,6 +12,25 @@ export interface UsageData {
   error: string | null;
 }
 
+export interface ResetCredit {
+  id: string;
+  title: string | null;
+  description: string | null;
+  grantedAt: number;
+  expiresAt: number | null;
+  resetType: string;
+  status: string;
+}
+
+export interface ResetCreditsSummary {
+  availableCount: number;
+  credits: ResetCredit[] | null;
+}
+
+export interface ConsumeResetResult {
+  outcome: "reset" | "nothingToReset" | "noCredit" | "alreadyRedeemed";
+}
+
 export interface HistoryPoint {
   t: number;
   p?: number | null;
