@@ -54,16 +54,32 @@ function requestConsume() {
 
 <template>
   <section class="reset-card">
-    <button
-      class="reset-header"
-      type="button"
-      :aria-expanded="expanded"
-      @click="expanded = !expanded"
-    >
-      <span class="reset-title">{{ t("使用限额重置") }}</span>
-      <span class="reset-badge" :class="{ empty: !summary?.availableCount }">{{ countLabel }}</span>
-      <span class="reset-chevron" :class="{ expanded }" aria-hidden="true">⌃</span>
-    </button>
+    <div class="reset-header">
+      <button
+        class="reset-toggle"
+        type="button"
+        :aria-expanded="expanded"
+        @click="expanded = !expanded"
+      >
+        <span class="reset-title">{{ t("使用限额重置") }}</span>
+        <span class="reset-badge" :class="{ empty: !summary?.availableCount }">{{ countLabel }}</span>
+        <span class="reset-chevron" :class="{ expanded }" aria-hidden="true">⌃</span>
+      </button>
+      <button
+        class="reset-refresh"
+        type="button"
+        :class="{ spinning: loading }"
+        :disabled="loading"
+        :title="loading ? t('刷新中…') : t('刷新')"
+        :aria-label="loading ? t('刷新中…') : t('刷新')"
+        @click="emit('refresh')"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+          <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+        </svg>
+      </button>
+    </div>
 
     <div v-if="expanded" class="reset-content">
       <div class="reset-copy">
@@ -82,9 +98,6 @@ function requestConsume() {
       >
         {{ loading ? t("处理中…") : confirming ? t("确认使用") : t("使用重置") }}
       </button>
-      <button v-else class="reset-refresh" type="button" :disabled="loading" @click="emit('refresh')">
-        {{ loading ? t("刷新中…") : t("刷新") }}
-      </button>
     </div>
     <p v-if="confirming" class="reset-warning">{{ t("重置机会使用后不可撤销，再次点击确认。") }}</p>
   </section>
@@ -98,13 +111,22 @@ function requestConsume() {
 }
 
 .reset-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding-right: 5px;
+}
+
+.reset-toggle {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  min-width: 0;
   min-height: 42px;
-  padding: 9px 11px;
+  padding: 9px 6px 9px 11px;
+  flex: 1;
   border: 0;
   background: transparent;
   color: var(--panel-text, #d8dce6);
@@ -121,8 +143,21 @@ function requestConsume() {
 .reset-copy { display: grid; gap: 3px; min-width: 0; flex: 1; }
 .reset-copy strong { color: var(--panel-text, #d8dce6); font-size: 12px; font-weight: 600; }
 .reset-copy span { color: var(--panel-val, #8f97a8); font-size: 10px; line-height: 1.35; }
-.reset-use, .reset-refresh { flex: 0 0 auto; border: 0; border-radius: 8px; padding: 7px 10px; background: #202127; color: #fff; font-size: 10px; font-weight: 600; cursor: pointer; }
+.reset-use { flex: 0 0 auto; border: 0; border-radius: 8px; padding: 7px 10px; background: #202127; color: #fff; font-size: 10px; font-weight: 600; cursor: pointer; }
 .reset-use.confirm { background: #c2414b; }
-.reset-use:disabled, .reset-refresh:disabled { opacity: 0.55; cursor: wait; }
+.reset-use:disabled { opacity: 0.55; cursor: wait; }
+.reset-refresh { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--panel-val, #8f97a8); cursor: pointer; }
+.reset-refresh:hover:not(:disabled) { background: rgba(255, 255, 255, 0.07); color: var(--panel-text, #d8dce6); }
+.reset-refresh:active:not(:disabled) { transform: scale(0.97); }
+.reset-refresh:focus-visible { outline: 2px solid var(--panel-accent, #6b8af0); outline-offset: -2px; }
+.reset-refresh:disabled { opacity: 0.55; cursor: wait; }
+.reset-refresh svg { width: 15px; height: 15px; }
+.reset-refresh.spinning svg { animation: reset-spin 0.8s linear infinite; }
 .reset-warning { margin: -4px 11px 10px; color: #e59a72; font-size: 10px; }
+
+@keyframes reset-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .reset-refresh.spinning svg { animation: none; }
+}
 </style>

@@ -59,7 +59,15 @@ fn wait_for_response(receiver: &mpsc::Receiver<String>, request_id: i64) -> Resu
 }
 
 fn run_rpc(method: &str, params: Value) -> Result<Value, String> {
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("cmd");
+        command.args(["/D", "/S", "/C", "codex app-server --stdio"]);
+        command
+    };
+    #[cfg(not(windows))]
     let mut command = Command::new("codex");
+    #[cfg(not(windows))]
     command.args(["app-server", "--stdio"]);
     #[cfg(windows)]
     {
@@ -130,15 +138,17 @@ fn run_rpc(method: &str, params: Value) -> Result<Value, String> {
     result
 }
 
-fn decode_summary(result: &Value) -> ResetCreditsSummary {
-    let summary = result.get("rateLimitResetCredits");
+fn decode_summary(result: &Value) -> Result<ResetCreditsSummary, String> {
+    let summary = result
+        .get("rateLimitResetCredits")
+        .ok_or_else(|| "Codex App Server 响应缺少 rateLimitResetCredits".to_string())?;
     let available_count = summary
-        .and_then(|value| value.get("availableCount"))
+        .get("availableCount")
         .and_then(Value::as_i64)
-        .unwrap_or(0)
+        .ok_or_else(|| "Codex App Server 响应缺少 availableCount".to_string())?
         .max(0);
     let credits = summary
-        .and_then(|value| value.get("credits"))
+        .get("credits")
         .and_then(Value::as_array)
         .map(|rows| {
             rows.iter()
@@ -166,10 +176,10 @@ fn decode_summary(result: &Value) -> ResetCreditsSummary {
                 })
                 .collect()
         });
-    ResetCreditsSummary {
+    Ok(ResetCreditsSummary {
         available_count,
         credits,
-    }
+    })
 }
 
 #[tauri::command]
@@ -179,10 +189,46 @@ pub async fn fetch_reset_credits() -> Result<ResetCreditsSummary, String> {
             "account/rateLimits/read",
             json!({ "excludeResetCreditDetails": false }),
         )
-        .map(|result| decode_summary(&result))
+        .and_then(|result| decode_summary(&result))
     })
     .await
     .map_err(|error| format!("读取重置机会失败：{error}"))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_summary;
+    use serde_json::json;
+
+    #[test]
+    fn decodes_available_reset_credit() {
+        let summary = decode_summary(&json!({
+            "rateLimitResetCredits": {
+                "availableCount": 1,
+                "credits": [{
+                    "id": "credit-1",
+                    "title": "Full reset",
+                    "description": "Reset weekly and five-hour limits",
+                    "grantedAt": 1_790_102_639_i64,
+                    "expiresAt": 1_792_694_639_i64,
+                    "resetType": "codexRateLimits",
+                    "status": "available"
+                }]
+            }
+        }))
+        .expect("valid reset credit response");
+
+        assert_eq!(summary.available_count, 1);
+        assert_eq!(summary.credits.as_ref().map(Vec::len), Some(1));
+    }
+
+    #[test]
+    fn rejects_response_without_reset_credit_data() {
+        let error = decode_summary(&json!({ "rateLimits": {} }))
+            .expect_err("missing reset credit data must not look like zero credits");
+
+        assert!(error.contains("rateLimitResetCredits"));
+    }
 }
 
 #[tauri::command]

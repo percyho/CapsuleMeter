@@ -2,8 +2,41 @@ mod reset_credits;
 mod usage;
 mod window_pos;
 use serde::Serialize;
-use std::process::Command;
-use tauri::Manager;
+use std::{
+    process::Command,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
+use tauri::{menu::MenuItem, Manager};
+
+#[derive(Clone)]
+struct TrayIconMenuState {
+    switcher: MenuItem<tauri::Wry>,
+    usage_selected: Arc<AtomicBool>,
+}
+
+impl TrayIconMenuState {
+    fn select(&self, mode: &str) -> Result<(), String> {
+        let usage_selected = mode == "usage";
+        self.switcher
+            .set_text(if usage_selected { "Logo" } else { "用量环" })
+            .map_err(|error| format!("更新托盘切换菜单失败：{error}"))?;
+        self.usage_selected.store(usage_selected, Ordering::Release);
+        Ok(())
+    }
+
+    fn toggle(&self) -> Result<&'static str, String> {
+        let next_mode = if self.usage_selected.load(Ordering::Acquire) {
+            "logo"
+        } else {
+            "usage"
+        };
+        self.select(next_mode)?;
+        Ok(next_mode)
+    }
+}
 
 #[derive(Serialize)]
 struct UpdateInfo {
@@ -149,10 +182,11 @@ fn update_tray_icon(
     five_hour: f64,
     weekly: f64,
 ) -> Result<(), String> {
+    let normalized_mode = if mode == "usage" { "usage" } else { "logo" };
     let tray = app
         .tray_by_id("main-tray")
         .ok_or_else(|| "托盘尚未初始化".to_string())?;
-    let icon = if mode == "usage" {
+    let icon = if normalized_mode == "usage" {
         usage_ring_icon(five_hour, weekly)
     } else {
         app.default_window_icon()
@@ -161,7 +195,7 @@ fn update_tray_icon(
     };
     tray.set_icon(Some(icon))
         .map_err(|error| format!("更新托盘图标失败：{error}"))?;
-    let tooltip = if mode == "usage" {
+    let tooltip = if normalized_mode == "usage" {
         format!(
             "Codex Capsule · 5 小时 {:.0}% · 每周 {:.0}%",
             five_hour, weekly
@@ -170,7 +204,8 @@ fn update_tray_icon(
         "Codex Capsule".to_string()
     };
     tray.set_tooltip(Some(tooltip))
-        .map_err(|error| format!("更新托盘提示失败：{error}"))
+        .map_err(|error| format!("更新托盘提示失败：{error}"))?;
+    app.state::<TrayIconMenuState>().select(normalized_mode)
 }
 
 #[cfg(test)]
@@ -219,7 +254,7 @@ pub fn run() {
         ])
         .setup(|app| {
             use tauri::{
-                menu::{Menu, MenuItem},
+                menu::{Menu, MenuItem, PredefinedMenuItem},
                 tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
                 Emitter,
             };
@@ -227,14 +262,30 @@ pub fn run() {
             let show = MenuItem::with_id(app, "show", "显示胶囊", true, None::<&str>)?;
             let refresh = MenuItem::with_id(app, "refresh", "立即刷新", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            let tray_icon_menu = TrayIconMenuState {
+                switcher: MenuItem::with_id(app, "tray-icon-switch", "用量环", true, None::<&str>)?,
+                usage_selected: Arc::new(AtomicBool::new(false)),
+            };
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &refresh, &settings, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &show,
+                    &refresh,
+                    &settings,
+                    &separator,
+                    &tray_icon_menu.switcher,
+                    &quit,
+                ],
+            )?;
+            let tray_icon_menu_for_event = tray_icon_menu.clone();
             TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Codex Capsule")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
+                .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {
                             let _ = w.show();
@@ -251,6 +302,11 @@ pub fn run() {
                             let _ = w.set_focus();
                         }
                         let _ = app.emit("tray-open-settings", ());
+                    }
+                    "tray-icon-switch" => {
+                        if let Ok(mode) = tray_icon_menu_for_event.toggle() {
+                            let _ = app.emit("tray-icon-mode-change", mode);
+                        }
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -270,6 +326,7 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+            app.manage(tray_icon_menu);
             Ok(())
         })
         .build(tauri::generate_context!())

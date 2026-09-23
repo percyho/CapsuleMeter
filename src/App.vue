@@ -11,6 +11,7 @@ import {
 } from "@tauri-apps/plugin-autostart";
 import StatsPanel from "./components/statistics/StatsPanel.vue";
 import ResetCreditsCard from "./components/usage/ResetCreditsCard.vue";
+import CapsuleThemePanel from "./components/appearance/CapsuleThemePanel.vue";
 import { useUiTheme } from "./composables/useUiTheme";
 import { useLocale } from "./composables/useLocale";
 import { useUsageHistory } from "./composables/useUsageHistory";
@@ -21,6 +22,7 @@ import type {
   UsageData,
   WindowData,
 } from "./types/usage";
+import { parseCapsuleTheme, type CapsuleTheme } from "./types/capsule-theme";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
@@ -81,11 +83,8 @@ let rightTimer: number | undefined;
 // —— 可配置项（localStorage 持久化）——
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
-type CapsuleStyle = "realistic" | "pixel";
 const storedCapsuleStyle = localStorage.getItem("capsuleStyle");
-const capsuleStyle = ref<CapsuleStyle>(
-  storedCapsuleStyle === "pixel" || storedCapsuleStyle === "beads" ? "pixel" : "realistic",
-);
+const capsuleStyle = ref<CapsuleTheme>(parseCapsuleTheme(storedCapsuleStyle));
 const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
 const { locale, setLocale, t } = useLocale();
 const activeTab = ref("appearance");
@@ -420,7 +419,7 @@ async function checkForUpdates() {
 
 function onTabKeydown(event: KeyboardEvent) {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  const tabs = ["appearance", "behavior", "stats", "reset", "system"];
+  const tabs = ["appearance", "capsule", "behavior", "stats", "reset", "system"];
   const current = tabs.indexOf(activeTab.value);
   const next = (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
   activeTab.value = tabs[next];
@@ -437,7 +436,7 @@ function onFontSizeChange() {
   applyWindowSettings();
 }
 
-function setCapsuleStyle(style: CapsuleStyle) {
+function setCapsuleStyle(style: CapsuleTheme) {
   capsuleStyle.value = style;
   localStorage.setItem("capsuleStyle", style);
 }
@@ -633,6 +632,7 @@ function resetDefaults() {
   applyAlwaysOnTop();
   applySnap();
   restartInterval();
+  void updateTrayIcon();
   void setCapsuleVisibility(true);
   void resetGlobalShortcut().catch((reason) => {
     systemMessage.value = `快捷键恢复失败：${String(reason)}`;
@@ -665,6 +665,9 @@ onMounted(() => {
     capsuleVisible.value = true;
     localStorage.setItem("capsuleVisible", "true");
     if (!showPanel.value) void togglePanel();
+  }).then(unlisten => unlistenEvents.push(unlisten));
+  void listen<TrayIconMode>("tray-icon-mode-change", ({ payload }) => {
+    onTrayIconModeChange(payload);
   }).then(unlisten => unlistenEvents.push(unlisten));
   void getCurrentWindow().onFocusChanged(({ payload }) => {
     if (payload && lastError.value?.includes("登录已过期")) void refresh();
@@ -707,6 +710,7 @@ onBeforeUnmount(() => {
     <div class="settings-shell">
       <div class="tabs" role="tablist" :aria-label="t('设置分类')" @keydown="onTabKeydown">
         <button class="tab" :class="{ on: activeTab==='appearance' }" role="tab" :aria-selected="activeTab==='appearance'" @click="activeTab='appearance'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg><span>{{ t("外观") }}</span></button>
+        <button class="tab" :class="{ on: activeTab==='capsule' }" role="tab" :aria-selected="activeTab==='capsule'" @click="activeTab='capsule'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="5"/><path d="M12 7v10"/></svg><span>{{ t("胶囊主题") }}</span></button>
         <button class="tab" :class="{ on: activeTab==='behavior' }" role="tab" :aria-selected="activeTab==='behavior'" @click="activeTab='behavior'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg><span>{{ t("行为") }}</span></button>
         <button class="tab" :class="{ on: activeTab==='stats' }" role="tab" :aria-selected="activeTab==='stats'" @click="activeTab='stats'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>{{ t("统计") }}</span></button>
         <button class="tab" :class="{ on: activeTab==='reset' }" role="tab" :aria-selected="activeTab==='reset'" @click="activeTab='reset'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-7a5 5 0 1 0 4.6 7"/><path d="m17 3 3 4-3 4"/></svg><span>{{ t("重置") }}</span></button>
@@ -731,13 +735,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="row">
-        <span class="row-name">{{ t("胶囊主题") }}</span>
-        <div class="seg" :aria-label="t('胶囊主题')">
-          <button :class="{ on: capsuleStyle === 'realistic' }" @click="setCapsuleStyle('realistic')">{{ t("仿真") }}</button>
-          <button :class="{ on: capsuleStyle === 'pixel' }" @click="setCapsuleStyle('pixel')">{{ t("像素") }}</button>
-        </div>
-      </div>
-      <div class="row">
         <span class="row-name">{{ t("透明度") }}</span>
         <input type="range" min="0.3" max="1" step="0.05" v-model.number="opacity" @input="onOpacityChange" />
         <span class="row-val">{{ Math.round(opacity * 100) }}%</span>
@@ -748,6 +745,10 @@ onBeforeUnmount(() => {
         <span class="row-val">{{ fontSize }}px</span>
       </div>
 
+      </template>
+
+      <template v-if="activeTab==='capsule'">
+        <CapsuleThemePanel :model-value="capsuleStyle" :translate="t" @select="setCapsuleStyle" />
       </template>
 
       <template v-if="activeTab==='behavior'">
@@ -926,7 +927,8 @@ body {
   border: 0;
   border-radius: 999px;
   box-shadow: none;
-  backdrop-filter: blur(14px) saturate(135%);
+  backdrop-filter: none;
+  isolation: isolate;
   overflow: hidden;
   cursor: default;
   transform-origin: center;
@@ -1029,15 +1031,13 @@ body {
 .capsule {
   gap: 0;
   padding: 0;
-  background:
-    linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.14) 48%, transparent 74%) 180% 0 / 220% 100%,
-    linear-gradient(180deg, rgba(49, 51, 63, 0.97), rgba(23, 24, 31, 0.98));
+  background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.24), 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
 .capsule:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 4px 13px rgba(0, 0, 0, 0.36), 0 0 11px rgba(111, 92, 246, 0.2); }
-.capsule:active { background: linear-gradient(rgba(96, 110, 137, 0.22), rgba(96, 110, 137, 0.22)), linear-gradient(180deg, rgba(45, 51, 64, 0.98), rgba(22, 26, 34, 0.98)); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.34), 0 1px 4px rgba(0, 0, 0, 0.26); }
+.capsule:active { background: transparent; box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.34), 0 1px 4px rgba(0, 0, 0, 0.26); }
 .capsule::before, .capsule::after { display: block; }
 .capsule .half { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .capsule .half:hover { background: rgba(255, 255, 255, 0.1); }
@@ -1057,27 +1057,98 @@ body {
 }
 
 .capsule-pixel {
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(14% 0,86% 0,86% 7%,93% 7%,93% 17%,100% 17%,100% 83%,93% 83%,93% 93%,86% 93%,86% 100%,14% 100%,14% 93%,7% 93%,7% 83%,0 83%,0 17%,7% 17%,7% 7%,14% 7%);
   image-rendering: pixelated;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  filter: none;
+  box-shadow: none;
+}
+
+.capsule-realistic .num { font-family: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.2px; }
+
+.capsule-pixel::before {
+  inset: 0;
+  height: auto;
+  z-index: 8;
+  box-sizing: border-box;
+  padding: 3px 7px;
+  background: #0b0d11;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
 .capsule-pixel .fill {
-  background-color: #625bd8;
+  background-color: #287cf5;
   background-image:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 50%, transparent 50%),
-    linear-gradient(rgba(255, 255, 255, 0.12) 50%, rgba(35, 24, 104, 0.2) 50%);
-  background-size: 6px 6px;
-  box-shadow: inset -2px 0 0 rgba(255, 255, 255, 0.2);
+    linear-gradient(180deg, #82c7ff 0, #378df8 43%, #2464e6 100%),
+    linear-gradient(90deg, rgba(255,255,255,.16) 50%, transparent 50%);
+  background-size: auto, 6px 6px;
+  box-shadow: inset 0 2px rgba(189,231,255,.54), inset 0 -3px rgba(18,75,192,.4);
 }
 
 .capsule-pixel .fill--red {
-  background-color: #e4516f;
-  background-image:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.17) 50%, transparent 50%),
-    linear-gradient(rgba(255, 255, 255, 0.11) 50%, rgba(91, 0, 20, 0.17) 50%);
-  background-size: 6px 6px;
-  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.18);
+  background-color: #303746;
+  background-image: linear-gradient(180deg, #5b6375, #303746 48%, #222734);
+  background-size: auto;
+  box-shadow: inset 0 2px rgba(255,255,255,.1), inset 0 -3px rgba(0,0,0,.18);
 }
+
+.capsule-pixel .num { font-family: "Cascadia Mono", Consolas, monospace; font-weight: 800; letter-spacing: -1px; text-shadow: 2px 2px 0 #15213a; }
+
+.capsule-flat {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.capsule-flat .fill { background: #3787f7; box-shadow: none; }
+.capsule-flat .fill--red { background: #111318; box-shadow: none; }
+.capsule-flat::before, .capsule-flat::after { display: none; }
+.capsule-flat .num { font-family: Arial, "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: 0; text-shadow: none; }
+
+.capsule-skeuomorphic {
+  border-color: rgba(149, 164, 188, 0.82);
+  background: transparent;
+  box-shadow: inset 0 2px 3px rgba(255,255,255,.48), inset 0 -3px 5px rgba(0,0,0,.52), 0 5px 9px rgba(0,0,0,.42);
+}
+
+.capsule-skeuomorphic .fill { background: linear-gradient(180deg, #b9efff, #2964f1 62%, #3420c8); box-shadow: inset 0 2px 2px rgba(255,255,255,.46); }
+.capsule-skeuomorphic .fill--red { background: linear-gradient(180deg, #596175, #171b28); }
+.capsule-skeuomorphic .num { font-family: "Trebuchet MS", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.3px; text-shadow: 0 2px 2px rgba(0,0,0,.6); }
+
+.capsule-jelly {
+  border-color: rgba(145, 234, 255, 0.82);
+  background: transparent;
+  box-shadow: inset 0 3px 3px rgba(255,255,255,.56), inset 0 -3px 5px rgba(22,52,160,.6), 0 0 8px rgba(74,207,255,.46);
+}
+
+.capsule-jelly .fill { background: linear-gradient(90deg, #3687ff, #736dff); box-shadow: inset 0 2px 2px rgba(255,255,255,.42); }
+.capsule-jelly .fill--red { background: linear-gradient(90deg, #8b62ff, #f244a9); }
+.capsule-jelly .num { font-family: "Arial Rounded MT Bold", "Segoe UI", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.35px; text-shadow: 0 1px 2px rgba(58,33,128,.66); }
+
+.capsule-neon {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(100deg, #42dfff 0%, #985cff 50%, #ff62c7 100%) border-box;
+  box-shadow: -2px 0 7px rgba(66,223,255,.6), 2px 0 7px rgba(255,98,199,.53), 0 0 12px rgba(122,53,255,.82), inset 0 0 8px rgba(19,28,85,.7);
+}
+
+.capsule-neon::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  background: #f06bff;
+  box-shadow: 0 0 5px #e053ff;
+}
+
+.capsule-neon .fill { background: linear-gradient(90deg, #073d72, #302070); box-shadow: inset 0 0 8px rgba(53,220,255,.33); }
+.capsule-neon .fill--red { background: linear-gradient(90deg, #38196d, #711452); box-shadow: inset 0 0 8px rgba(255,79,203,.33); }
+.capsule-neon .num { color: #fff; font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif; font-weight: 600; letter-spacing: .35px; text-shadow: 0 0 4px #86eaff, 0 0 8px #945cff; }
 
 .num {
   position: absolute;
