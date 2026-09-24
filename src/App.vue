@@ -2,8 +2,16 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import {
+  getCurrentWindow,
+  LogicalSize,
+  LogicalPosition,
+} from "@tauri-apps/api/window";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import {
   enable as autostartEnable,
   disable as autostartDisable,
@@ -23,11 +31,14 @@ import type {
   WindowData,
 } from "./types/usage";
 import { parseCapsuleTheme, type CapsuleTheme } from "./types/capsule-theme";
-import { evaluateConsumptionSpeed, type ConsumptionSpeedState } from "./utils/consumption-speed";
+import {
+  evaluateConsumptionSpeed,
+  type ConsumptionSpeedState,
+} from "./utils/consumption-speed";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
-const CAPSULE_WIDTH = 100;
+const CAPSULE_WIDTH = 140;
 const CAPSULE_HEIGHT = 34;
 let dragTracking: { sx: number; sy: number; started: boolean } | null = null;
 
@@ -91,7 +102,9 @@ const capsuleStyle = ref<CapsuleTheme>(parseCapsuleTheme(storedCapsuleStyle));
 const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
 const { locale, setLocale, t } = useLocale();
 const activeTab = ref("appearance");
-const { historyPoints, appendUsage } = useUsageHistory({ syncAcrossWindows: true });
+const { historyPoints, appendUsage } = useUsageHistory({
+  syncAcrossWindows: true,
+});
 function recordHistory() {
   if (!usage.value || usage.value.error) return;
   appendUsage(usage.value);
@@ -100,19 +113,28 @@ async function onQuit() {
   await invoke("quit_app");
 }
 
-
 const alwaysOnTop = ref(localStorage.getItem("alwaysOnTop") !== "false");
 const snapEnabled = ref(localStorage.getItem("snapEnabled") !== "false");
 const displayMode = ref(localStorage.getItem("displayMode") ?? "remaining"); // remaining | used
-const showUsageValues = ref(localStorage.getItem("showUsageValues") !== "false");
+const showUsageValues = ref(
+  localStorage.getItem("showUsageValues") !== "false",
+);
 const refreshMin = ref(Number(localStorage.getItem("refreshMin") ?? "5"));
 const resetShowSec = ref(Number(localStorage.getItem("resetShowSec") ?? "5"));
-const historyRetentionDays = ref(Number(localStorage.getItem("historyRetentionDays") ?? "30"));
-const notificationsEnabled = ref(localStorage.getItem("notificationsEnabled") === "true");
-const notificationThreshold = ref(Number(localStorage.getItem("notificationThreshold") ?? "20"));
+const historyRetentionDays = ref(
+  Number(localStorage.getItem("historyRetentionDays") ?? "30"),
+);
+const notificationsEnabled = ref(
+  localStorage.getItem("notificationsEnabled") === "true",
+);
+const notificationThreshold = ref(
+  Number(localStorage.getItem("notificationThreshold") ?? "20"),
+);
 const capsuleVisible = ref(localStorage.getItem("capsuleVisible") !== "false");
 type TrayIconMode = "logo" | "usage";
-const trayIconMode = ref<TrayIconMode>(localStorage.getItem("trayIconMode") === "usage" ? "usage" : "logo");
+const trayIconMode = ref<TrayIconMode>(
+  localStorage.getItem("trayIconMode") === "usage" ? "usage" : "logo",
+);
 const systemMessage = ref("");
 const autostart = ref(false);
 let unlistenEvents: UnlistenFn[] = [];
@@ -173,15 +195,21 @@ const speedLabels: Record<ConsumptionSpeedState, string> = {
   critical: "消耗过快",
 };
 
-const fiveHourSpeed = computed(() => evaluateConsumptionSpeed(historyPoints.value, "fiveHour"));
-const weeklySpeed = computed(() => evaluateConsumptionSpeed(historyPoints.value, "weekly"));
-const speedOutlineStyle = computed(() => ({
+const fiveHourSpeed = computed(() =>
+  evaluateConsumptionSpeed(historyPoints.value, "fiveHour"),
+);
+const weeklySpeed = computed(() =>
+  evaluateConsumptionSpeed(historyPoints.value, "weekly"),
+);
+const speedIndicatorStyle = computed(() => ({
   "--speed-left": speedColors[fiveHourSpeed.value.state],
   "--speed-right": speedColors[weeklySpeed.value.state],
 }));
 
 function formatSpeedHint(label: string, percentPerHour: number | null): string {
-  return percentPerHour === null ? label : `${label} · ${percentPerHour.toFixed(1)}%/小时`;
+  return percentPerHour === null
+    ? label
+    : `${label} · ${percentPerHour.toFixed(1)}%/小时`;
 }
 
 /** 把重置时间戳格式化为准确时间：当天显示 HH:MM，跨天显示 M/D HH:MM */
@@ -307,7 +335,9 @@ async function refreshResetCredits() {
   resetCreditsLoading.value = true;
   resetCreditsError.value = null;
   try {
-    resetCredits.value = await invoke<ResetCreditsSummary>("fetch_reset_credits");
+    resetCredits.value = await invoke<ResetCreditsSummary>(
+      "fetch_reset_credits",
+    );
   } catch (reason) {
     resetCreditsError.value = String(reason);
   } finally {
@@ -356,7 +386,10 @@ watch(refreshMin, (value) => {
 // —— 外观 ——
 function applyWindowSettings() {
   document.body.style.opacity = String(opacity.value);
-  document.documentElement.style.setProperty("--num-size", fontSize.value + "px");
+  document.documentElement.style.setProperty(
+    "--num-size",
+    fontSize.value + "px",
+  );
   applyTheme();
 }
 
@@ -385,9 +418,12 @@ async function maybeNotifyLowUsage(data: UsageData) {
   const cycle = String(data.five_hour.reset_at ?? "unknown");
   if (localStorage.getItem("lastNotifiedCycle") === cycle) return;
   let allowed = await isPermissionGranted();
-  if (!allowed) allowed = await requestPermission() === "granted";
+  if (!allowed) allowed = (await requestPermission()) === "granted";
   if (!allowed) return;
-  sendNotification({ title: "Codex 用量提醒", body: `5 小时额度仅剩 ${Math.round(remaining)}%` });
+  sendNotification({
+    title: "Codex 用量提醒",
+    body: `5 小时额度仅剩 ${Math.round(remaining)}%`,
+  });
   localStorage.setItem("lastNotifiedCycle", cycle);
 }
 
@@ -395,7 +431,9 @@ async function onShortcutChange() {
   const nextEnabled = !shortcutEnabled.value;
   try {
     await setShortcutEnabled(nextEnabled);
-    systemMessage.value = nextEnabled ? `快捷键已启用：${globalShortcut.value}` : "快捷键已停用";
+    systemMessage.value = nextEnabled
+      ? `快捷键已启用：${globalShortcut.value}`
+      : "快捷键已停用";
   } catch (reason) {
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   }
@@ -406,7 +444,9 @@ async function onShortcutKeydown(event: KeyboardEvent) {
   event.stopPropagation();
   try {
     const value = await captureGlobalShortcut(event);
-    systemMessage.value = value ? `快捷键已更新：${value}` : "请按下 Ctrl、Alt 或 Meta 与其他按键的组合";
+    systemMessage.value = value
+      ? `快捷键已更新：${value}`
+      : "请按下 Ctrl、Alt 或 Meta 与其他按键的组合";
   } catch (reason) {
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   }
@@ -415,29 +455,55 @@ async function onShortcutKeydown(event: KeyboardEvent) {
 async function onNotificationChange() {
   if (notificationsEnabled.value) {
     let allowed = await isPermissionGranted();
-    if (!allowed) allowed = await requestPermission() === "granted";
+    if (!allowed) allowed = (await requestPermission()) === "granted";
     if (!allowed) {
       notificationsEnabled.value = false;
       systemMessage.value = "系统通知权限未授予";
     }
   }
-  localStorage.setItem("notificationsEnabled", String(notificationsEnabled.value));
+  localStorage.setItem(
+    "notificationsEnabled",
+    String(notificationsEnabled.value),
+  );
 }
-function onNotificationThresholdChange() { localStorage.setItem("notificationThreshold", String(notificationThreshold.value)); }
-function onRetentionChange() { localStorage.setItem("historyRetentionDays", String(historyRetentionDays.value)); }
+function onNotificationThresholdChange() {
+  localStorage.setItem(
+    "notificationThreshold",
+    String(notificationThreshold.value),
+  );
+}
+function onRetentionChange() {
+  localStorage.setItem(
+    "historyRetentionDays",
+    String(historyRetentionDays.value),
+  );
+}
 
 async function startLogin() {
   systemMessage.value = "已打开 Codex 登录窗口，登录完成后请点击立即刷新";
-  try { await invoke("start_codex_login"); } catch (reason) { systemMessage.value = String(reason); }
+  try {
+    await invoke("start_codex_login");
+  } catch (reason) {
+    systemMessage.value = String(reason);
+  }
 }
 
 async function runDiagnostics() {
   systemMessage.value = "正在诊断…";
-  try { systemMessage.value = (await invoke<string>("diagnose_codex")) || "诊断完成，未发现异常"; }
-  catch (reason) { systemMessage.value = `诊断失败：${String(reason)}`; }
+  try {
+    systemMessage.value =
+      (await invoke<string>("diagnose_codex")) || "诊断完成，未发现异常";
+  } catch (reason) {
+    systemMessage.value = `诊断失败：${String(reason)}`;
+  }
 }
 
-interface UpdateInfo { current: string; latest: string | null; url: string | null; error: string | null }
+interface UpdateInfo {
+  current: string;
+  latest: string | null;
+  url: string | null;
+  error: string | null;
+}
 async function checkForUpdates() {
   systemMessage.value = "正在检查更新…";
   const info = await invoke<UpdateInfo>("check_update");
@@ -450,11 +516,22 @@ async function checkForUpdates() {
 
 function onTabKeydown(event: KeyboardEvent) {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  const tabs = ["appearance", "capsule", "behavior", "stats", "reset", "system"];
+  const tabs = [
+    "appearance",
+    "capsule",
+    "behavior",
+    "stats",
+    "reset",
+    "system",
+  ];
   const current = tabs.indexOf(activeTab.value);
-  const next = (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+  const next =
+    (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+    tabs.length;
   activeTab.value = tabs[next];
-  (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>("[role=tab]")[next]?.focus();
+  (event.currentTarget as HTMLElement)
+    .querySelectorAll<HTMLButtonElement>("[role=tab]")
+    [next]?.focus();
   event.preventDefault();
 }
 
@@ -523,11 +600,15 @@ function onResetShowSecChange() {
   // 若正在显示重置时间，立即用新时长重新计时
   if (showLeftReset.value) {
     clearTimer("left");
-    leftTimer = window.setTimeout(() => { showLeftReset.value = false; }, resetShowSec.value * 1000);
+    leftTimer = window.setTimeout(() => {
+      showLeftReset.value = false;
+    }, resetShowSec.value * 1000);
   }
   if (showRightReset.value) {
     clearTimer("right");
-    rightTimer = window.setTimeout(() => { showRightReset.value = false; }, resetShowSec.value * 1000);
+    rightTimer = window.setTimeout(() => {
+      showRightReset.value = false;
+    }, resetShowSec.value * 1000);
   }
 }
 
@@ -559,14 +640,36 @@ const PANEL_DEFAULT_WIDTH = 360;
 const PANEL_DEFAULT_HEIGHT = 380;
 const PANEL_MIN_WIDTH = 320;
 const PANEL_MIN_HEIGHT = 280;
-const storedPanelW = Number(localStorage.getItem("panelW") ?? PANEL_DEFAULT_WIDTH);
-const storedPanelH = Number(localStorage.getItem("panelH") ?? PANEL_DEFAULT_HEIGHT);
-const panelW = ref(Math.max(PANEL_MIN_WIDTH, Number.isFinite(storedPanelW) ? storedPanelW : PANEL_DEFAULT_WIDTH));
-const panelH = ref(Math.max(PANEL_MIN_HEIGHT, Number.isFinite(storedPanelH) ? storedPanelH : PANEL_DEFAULT_HEIGHT));
-let panelResize: { sx: number; sy: number; x: number; y: number; w: number; h: number } | null = null;
+const storedPanelW = Number(
+  localStorage.getItem("panelW") ?? PANEL_DEFAULT_WIDTH,
+);
+const storedPanelH = Number(
+  localStorage.getItem("panelH") ?? PANEL_DEFAULT_HEIGHT,
+);
+const panelW = ref(
+  Math.max(
+    PANEL_MIN_WIDTH,
+    Number.isFinite(storedPanelW) ? storedPanelW : PANEL_DEFAULT_WIDTH,
+  ),
+);
+const panelH = ref(
+  Math.max(
+    PANEL_MIN_HEIGHT,
+    Number.isFinite(storedPanelH) ? storedPanelH : PANEL_DEFAULT_HEIGHT,
+  ),
+);
+let panelResize: {
+  sx: number;
+  sy: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} | null = null;
 
 function onPanelDragStart(event: MouseEvent) {
-  if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+  if (event.button !== 0 || (event.target as HTMLElement).closest("button"))
+    return;
   startWindowDrag();
 }
 
@@ -592,8 +695,12 @@ function onPanelResizeMove(e: MouseEvent) {
   panelH.value = Math.max(PANEL_MIN_HEIGHT, panelResize.h + dy);
   const appliedDx = panelResize.w - panelW.value;
   const win = getCurrentWindow();
-  void win.setSize(new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value));
-  void win.setPosition(new LogicalPosition(panelResize.x + appliedDx, panelResize.y));
+  void win.setSize(
+    new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value),
+  );
+  void win.setPosition(
+    new LogicalPosition(panelResize.x + appliedDx, panelResize.y),
+  );
 }
 function onPanelResizeEnd() {
   localStorage.setItem("panelW", String(panelW.value));
@@ -614,10 +721,14 @@ async function togglePanel() {
     const winY = window.screenY;
     const screenW = window.screen.availWidth;
     console.log("DEBUG:", { winX, winY, screenW, panelW: panelW.value });
-    panelAlignRight.value = (winX + panelW.value) > screenW;
-    await win.setSize(new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value));
+    panelAlignRight.value = winX + panelW.value > screenW;
+    await win.setSize(
+      new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value),
+    );
     if (panelAlignRight.value) {
-      await win.setPosition(new LogicalPosition(winX - (panelW.value - CAPSULE_WIDTH), winY));
+      await win.setPosition(
+        new LogicalPosition(winX - (panelW.value - CAPSULE_WIDTH), winY),
+      );
     }
   } else {
     // 关闭面板时恢复窗口宽度和位置
@@ -625,7 +736,9 @@ async function togglePanel() {
     const winY = window.screenY;
     await win.setSize(new LogicalSize(CAPSULE_WIDTH, CAPSULE_HEIGHT));
     if (panelAlignRight.value) {
-      await win.setPosition(new LogicalPosition(winX + (panelW.value - CAPSULE_WIDTH), winY));
+      await win.setPosition(
+        new LogicalPosition(winX + (panelW.value - CAPSULE_WIDTH), winY),
+      );
     }
     panelAlignRight.value = false;
   }
@@ -656,9 +769,26 @@ function resetDefaults() {
   trayIconMode.value = "logo";
   panelW.value = PANEL_DEFAULT_WIDTH;
   panelH.value = PANEL_DEFAULT_HEIGHT;
-  ["opacity", "fontSize", "capsuleStyle", "uiTheme", "appLocale", "alwaysOnTop", "snapEnabled", "displayMode", "showUsageValues", "refreshMin", "resetShowSec", "historyRetentionDays", "notificationsEnabled", "notificationThreshold", "capsuleVisible", "trayIconMode", "panelW", "panelH"].forEach((k) =>
-    localStorage.removeItem(k)
-  );
+  [
+    "opacity",
+    "fontSize",
+    "capsuleStyle",
+    "uiTheme",
+    "appLocale",
+    "alwaysOnTop",
+    "snapEnabled",
+    "displayMode",
+    "showUsageValues",
+    "refreshMin",
+    "resetShowSec",
+    "historyRetentionDays",
+    "notificationsEnabled",
+    "notificationThreshold",
+    "capsuleVisible",
+    "trayIconMode",
+    "panelW",
+    "panelH",
+  ].forEach((k) => localStorage.removeItem(k));
   applyWindowSettings();
   applyAlwaysOnTop();
   applySnap();
@@ -672,7 +802,9 @@ function resetDefaults() {
     autostart.value = false;
     onAutostartChange();
   }
-  getCurrentWindow().setSize(new LogicalSize(PANEL_DEFAULT_WIDTH, CAPSULE_HEIGHT + PANEL_DEFAULT_HEIGHT));
+  getCurrentWindow().setSize(
+    new LogicalSize(PANEL_DEFAULT_WIDTH, CAPSULE_HEIGHT + PANEL_DEFAULT_HEIGHT),
+  );
 }
 
 onMounted(() => {
@@ -687,236 +819,617 @@ onMounted(() => {
   });
   void updateTrayIcon();
   if (!capsuleVisible.value) void getCurrentWindow().hide();
-  void listen("tray-refresh", () => void refresh()).then(unlisten => unlistenEvents.push(unlisten));
+  void listen("tray-refresh", () => void refresh()).then((unlisten) =>
+    unlistenEvents.push(unlisten),
+  );
   void listen("tray-show", () => {
     capsuleVisible.value = true;
     localStorage.setItem("capsuleVisible", "true");
-  }).then(unlisten => unlistenEvents.push(unlisten));
+  }).then((unlisten) => unlistenEvents.push(unlisten));
   void listen("tray-open-settings", () => {
     capsuleVisible.value = true;
     localStorage.setItem("capsuleVisible", "true");
     if (!showPanel.value) void togglePanel();
-  }).then(unlisten => unlistenEvents.push(unlisten));
+  }).then((unlisten) => unlistenEvents.push(unlisten));
   void listen<TrayIconMode>("tray-icon-mode-change", ({ payload }) => {
     onTrayIconModeChange(payload);
-  }).then(unlisten => unlistenEvents.push(unlisten));
-  void getCurrentWindow().onFocusChanged(({ payload }) => {
-    if (payload && lastError.value?.includes("登录已过期")) void refresh();
-  }).then(unlisten => unlistenEvents.push(unlisten));
+  }).then((unlisten) => unlistenEvents.push(unlisten));
+  void getCurrentWindow()
+    .onFocusChanged(({ payload }) => {
+      if (payload && lastError.value?.includes("登录已过期")) void refresh();
+    })
+    .then((unlisten) => unlistenEvents.push(unlisten));
 });
 
 onBeforeUnmount(() => {
   if (interval) window.clearInterval(interval);
   clearTimer("left");
   clearTimer("right");
-  unlistenEvents.forEach(unlisten => unlisten());
+  unlistenEvents.forEach((unlisten) => unlisten());
 });
 </script>
 
 <template>
-  <div class="capsule" :class="[{'error': lastError}, {'capsule-right': panelAlignRight}, `capsule-${capsuleStyle}`]" @mousedown="onCapsuleMouseDown" @contextmenu="onContextMenu">
-    <div class="half left" @click="onLeftClick" :title="leftTitle">
-      <div class="fill" :style="{ width: leftFillWidth }"></div>
-      <span v-show="showUsageValues" class="num" :class="{ dim: showLeftReset }">{{ leftDisplay }}</span>
+  <div
+    class="capsule-shell"
+    :class="{ 'capsule-shell-right': panelAlignRight }"
+    :style="speedIndicatorStyle"
+    @mousedown="onCapsuleMouseDown"
+    @contextmenu="onContextMenu"
+  >
+    <div
+      class="capsule"
+      :class="[{ error: lastError }, `capsule-${capsuleStyle}`]"
+    >
+      <div class="half left" @click="onLeftClick" :title="leftTitle">
+        <div class="fill" :style="{ width: leftFillWidth }"></div>
+        <span
+          v-show="showUsageValues"
+          class="num"
+          :class="{ dim: showLeftReset }"
+          >{{ leftDisplay }}</span
+        >
+      </div>
+      <div class="half right" @click="onRightClick" :title="rightTitle">
+        <div class="fill fill--red" :style="{ width: rightFillWidth }"></div>
+        <span
+          v-show="showUsageValues"
+          class="num"
+          :class="{ dim: showRightReset }"
+          >{{ rightDisplay }}</span
+        >
+      </div>
     </div>
-    <div class="half right" @click="onRightClick" :title="rightTitle">
-      <div class="fill fill--red" :style="{ width: rightFillWidth }"></div>
-      <span v-show="showUsageValues" class="num" :class="{ dim: showRightReset }">{{ rightDisplay }}</span>
+    <div class="speed-indicators" aria-hidden="true">
+      <span class="speed-indicator speed-indicator--left"></span>
+      <span class="speed-indicator speed-indicator--right"></span>
     </div>
-    <div class="speed-outline" :style="speedOutlineStyle" aria-hidden="true"></div>
   </div>
 
-  <div v-if="showPanel" class="panel" :class='{ "align-right": panelAlignRight }' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
+  <div
+    v-if="showPanel"
+    class="panel"
+    :class="{ 'align-right': panelAlignRight }"
+    :style="{ width: panelW + 'px', height: panelH + 'px' }"
+    @contextmenu.prevent
+  >
     <div class="panel-head" @mousedown="onPanelDragStart">
       <div class="panel-heading">
         <span class="panel-title">{{ t("设置") }}</span>
         <span class="panel-description">{{ t("个性化用量胶囊") }}</span>
       </div>
       <div class="panel-account">
-        <span class="panel-sub">{{ lastError ? t("数据异常") : (usage?.plan || t("未登录")).toUpperCase() }}</span>
-        <span v-if="usage?.account && !lastError" class="panel-account-name" :title="usage.account">{{ usage.account }}</span>
+        <span class="panel-sub">{{
+          lastError ? t("数据异常") : (usage?.plan || t("未登录")).toUpperCase()
+        }}</span>
+        <span
+          v-if="usage?.account && !lastError"
+          class="panel-account-name"
+          :title="usage.account"
+          >{{ usage.account }}</span
+        >
       </div>
-      <button class="panel-close" :title="t('关闭设置')" :aria-label="t('关闭设置')" @click="togglePanel()">×</button>
+      <button
+        class="panel-close"
+        :title="t('关闭设置')"
+        :aria-label="t('关闭设置')"
+        @click="togglePanel()"
+      >
+        ×
+      </button>
     </div>
 
     <div class="settings-shell">
-      <div class="tabs" role="tablist" :aria-label="t('设置分类')" @keydown="onTabKeydown">
-        <button class="tab" :class="{ on: activeTab==='appearance' }" role="tab" :aria-selected="activeTab==='appearance'" @click="activeTab='appearance'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg><span>{{ t("外观") }}</span></button>
-        <button class="tab" :class="{ on: activeTab==='capsule' }" role="tab" :aria-selected="activeTab==='capsule'" @click="activeTab='capsule'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="5"/><path d="M12 7v10"/></svg><span>{{ t("胶囊主题") }}</span></button>
-        <button class="tab" :class="{ on: activeTab==='behavior' }" role="tab" :aria-selected="activeTab==='behavior'" @click="activeTab='behavior'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg><span>{{ t("行为") }}</span></button>
-        <button class="tab" :class="{ on: activeTab==='stats' }" role="tab" :aria-selected="activeTab==='stats'" @click="activeTab='stats'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>{{ t("统计") }}</span></button>
-        <button class="tab" :class="{ on: activeTab==='reset' }" role="tab" :aria-selected="activeTab==='reset'" @click="activeTab='reset'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-7a5 5 0 1 0 4.6 7"/><path d="m17 3 3 4-3 4"/></svg><span>{{ t("重置") }}</span></button>
-        <button class="tab" :class="{ on: activeTab==='system' }" role="tab" :aria-selected="activeTab==='system'" @click="activeTab='system'"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>{{ t("系统") }}</span></button>
+      <div
+        class="tabs"
+        role="tablist"
+        :aria-label="t('设置分类')"
+        @keydown="onTabKeydown"
+      >
+        <button
+          class="tab"
+          :class="{ on: activeTab === 'appearance' }"
+          role="tab"
+          :aria-selected="activeTab === 'appearance'"
+          @click="activeTab = 'appearance'"
+        >
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 3v18M3 12h18" /></svg
+          ><span>{{ t("外观") }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ on: activeTab === 'capsule' }"
+          role="tab"
+          :aria-selected="activeTab === 'capsule'"
+          @click="activeTab = 'capsule'"
+        >
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="7" width="18" height="10" rx="5" />
+            <path d="M12 7v10" /></svg
+          ><span>{{ t("胶囊主题") }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ on: activeTab === 'behavior' }"
+          role="tab"
+          :aria-selected="activeTab === 'behavior'"
+          @click="activeTab = 'behavior'"
+        >
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"
+            /></svg
+          ><span>{{ t("行为") }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ on: activeTab === 'stats' }"
+          role="tab"
+          :aria-selected="activeTab === 'stats'"
+          @click="activeTab = 'stats'"
+        >
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg
+          ><span>{{ t("统计") }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ on: activeTab === 'reset' }"
+          role="tab"
+          :aria-selected="activeTab === 'reset'"
+          @click="activeTab = 'reset'"
+        >
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M20 7h-7a5 5 0 1 0 4.6 7" />
+            <path d="m17 3 3 4-3 4" /></svg
+          ><span>{{ t("重置") }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ on: activeTab === 'system' }"
+          role="tab"
+          :aria-selected="activeTab === 'system'"
+          @click="activeTab = 'system'"
+        >
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v5M12 8h.01" /></svg
+          ><span>{{ t("系统") }}</span>
+        </button>
       </div>
 
       <div class="panel-body">
-      <template v-if="activeTab==='appearance'">
-      <div class="row">
-        <span class="row-name">{{ t("界面主题") }}</span>
-        <div class="seg" aria-label="界面主题">
-          <button :class="{ on: uiTheme === 'light' }" @click="setUiTheme('light')">{{ t("明亮") }}</button>
-          <button :class="{ on: uiTheme === 'dark' }" @click="setUiTheme('dark')">{{ t("暗黑") }}</button>
-          <button :class="{ on: uiTheme === 'system' }" @click="setUiTheme('system')">{{ t("跟随系统") }}</button>
-        </div>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("语言") }}</span>
-        <div class="seg" aria-label="Language">
-          <button :class="{ on: locale === 'zh-CN' }" @click="setLocale('zh-CN')">中文</button>
-          <button :class="{ on: locale === 'en-US' }" @click="setLocale('en-US')">English</button>
-        </div>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("透明度") }}</span>
-        <input type="range" min="0.3" max="1" step="0.05" v-model.number="opacity" @input="onOpacityChange" />
-        <span class="row-val">{{ Math.round(opacity * 100) }}%</span>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("字号") }}</span>
-        <input type="range" min="9" max="20" step="1" v-model.number="fontSize" @input="onFontSizeChange" />
-        <span class="row-val">{{ fontSize }}px</span>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("显示用量数值") }}</span>
-        <button class="switch" :class="{ on: showUsageValues }" @click="onShowUsageValuesChange()">
-          <span class="knob"></span>
-        </button>
-      </div>
+        <template v-if="activeTab === 'appearance'">
+          <div class="row">
+            <span class="row-name">{{ t("界面主题") }}</span>
+            <div class="seg" aria-label="界面主题">
+              <button
+                :class="{ on: uiTheme === 'light' }"
+                @click="setUiTheme('light')"
+              >
+                {{ t("明亮") }}
+              </button>
+              <button
+                :class="{ on: uiTheme === 'dark' }"
+                @click="setUiTheme('dark')"
+              >
+                {{ t("暗黑") }}
+              </button>
+              <button
+                :class="{ on: uiTheme === 'system' }"
+                @click="setUiTheme('system')"
+              >
+                {{ t("跟随系统") }}
+              </button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("语言") }}</span>
+            <div class="seg" aria-label="Language">
+              <button
+                :class="{ on: locale === 'zh-CN' }"
+                @click="setLocale('zh-CN')"
+              >
+                中文
+              </button>
+              <button
+                :class="{ on: locale === 'en-US' }"
+                @click="setLocale('en-US')"
+              >
+                English
+              </button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("透明度") }}</span>
+            <input
+              type="range"
+              min="0.3"
+              max="1"
+              step="0.05"
+              v-model.number="opacity"
+              @input="onOpacityChange"
+            />
+            <span class="row-val">{{ Math.round(opacity * 100) }}%</span>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("字号") }}</span>
+            <input
+              type="range"
+              min="9"
+              max="20"
+              step="1"
+              v-model.number="fontSize"
+              @input="onFontSizeChange"
+            />
+            <span class="row-val">{{ fontSize }}px</span>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("显示用量数值") }}</span>
+            <button
+              class="switch"
+              :class="{ on: showUsageValues }"
+              @click="onShowUsageValuesChange()"
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
+        </template>
 
-      </template>
+        <template v-if="activeTab === 'capsule'">
+          <CapsuleThemePanel
+            :model-value="capsuleStyle"
+            :translate="t"
+            @select="setCapsuleStyle"
+          />
+        </template>
 
-      <template v-if="activeTab==='capsule'">
-        <CapsuleThemePanel :model-value="capsuleStyle" :translate="t" @select="setCapsuleStyle" />
-      </template>
+        <template v-if="activeTab === 'behavior'">
+          <div class="group-label">{{ t("行为") }}</div>
+          <div class="row">
+            <span class="row-name">{{ t("窗口置顶") }}</span>
+            <button
+              class="switch"
+              :class="{ on: alwaysOnTop }"
+              @click="
+                alwaysOnTop = !alwaysOnTop;
+                onAlwaysOnTopChange();
+              "
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("贴边吸附") }}</span>
+            <button
+              class="switch"
+              :class="{ on: snapEnabled }"
+              @click="
+                snapEnabled = !snapEnabled;
+                onSnapChange();
+              "
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("显示模式") }}</span>
+            <div class="seg">
+              <button
+                :class="{ on: displayMode === 'remaining' }"
+                @click="
+                  displayMode = 'remaining';
+                  onDisplayModeChange();
+                "
+              >
+                {{ t("剩余") }}
+              </button>
+              <button
+                :class="{ on: displayMode === 'used' }"
+                @click="
+                  displayMode = 'used';
+                  onDisplayModeChange();
+                "
+              >
+                {{ t("已用") }}
+              </button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("重置显示时长") }}</span>
+            <select
+              v-model.number="resetShowSec"
+              @change="onResetShowSecChange()"
+            >
+              <option
+                v-for="seconds in [3, 5, 8, 10]"
+                :key="seconds"
+                :value="seconds"
+              >
+                {{ locale === "en-US" ? `${seconds} sec` : `${seconds} 秒` }}
+              </option>
+            </select>
+          </div>
 
-      <template v-if="activeTab==='behavior'">
-      <div class="group-label">{{ t("行为") }}</div>
-      <div class="row">
-        <span class="row-name">{{ t("窗口置顶") }}</span>
-        <button class="switch" :class="{ on: alwaysOnTop }" @click="alwaysOnTop = !alwaysOnTop; onAlwaysOnTopChange()">
-          <span class="knob"></span>
-        </button>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("贴边吸附") }}</span>
-        <button class="switch" :class="{ on: snapEnabled }" @click="snapEnabled = !snapEnabled; onSnapChange()">
-          <span class="knob"></span>
-        </button>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("显示模式") }}</span>
-        <div class="seg">
-          <button :class="{ on: displayMode === 'remaining' }" @click="displayMode = 'remaining'; onDisplayModeChange()">{{ t("剩余") }}</button>
-          <button :class="{ on: displayMode === 'used' }" @click="displayMode = 'used'; onDisplayModeChange()">{{ t("已用") }}</button>
-        </div>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("重置显示时长") }}</span>
-        <select v-model.number="resetShowSec" @change="onResetShowSecChange()">
-          <option v-for="seconds in [3, 5, 8, 10]" :key="seconds" :value="seconds">{{ locale === "en-US" ? `${seconds} sec` : `${seconds} 秒` }}</option>
-        </select>
-      </div>
+          <div class="group-label">{{ t("数据") }}</div>
+          <div class="row">
+            <span class="row-name">{{ t("自动刷新") }}</span>
+            <select v-model.number="refreshMin">
+              <option
+                v-for="minutes in [1, 2, 5, 10, 30]"
+                :key="minutes"
+                :value="minutes"
+              >
+                {{ locale === "en-US" ? `${minutes} min` : `${minutes} 分钟` }}
+              </option>
+            </select>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("上次刷新") }}</span>
+            <span class="row-val">{{ lastRefresh }}</span>
+            <button class="btn-mini" :disabled="loading" @click="refresh()">
+              {{ loading ? t("刷新中…") : t("立即刷新") }}
+            </button>
+          </div>
+          <div class="row">
+            <span class="row-name">{{ t("历史保留") }}</span>
+            <select
+              v-model.number="historyRetentionDays"
+              @change="onRetentionChange"
+            >
+              <option
+                v-for="days in [7, 30, 90, 365]"
+                :key="days"
+                :value="days"
+              >
+                {{
+                  days === 365
+                    ? locale === "en-US"
+                      ? "1 year"
+                      : "1 年"
+                    : locale === "en-US"
+                      ? `${days} days`
+                      : `${days} 天`
+                }}
+              </option>
+            </select>
+          </div>
+        </template>
 
-      <div class="group-label">{{ t("数据") }}</div>
-      <div class="row">
-        <span class="row-name">{{ t("自动刷新") }}</span>
-        <select v-model.number="refreshMin">
-          <option v-for="minutes in [1, 2, 5, 10, 30]" :key="minutes" :value="minutes">{{ locale === "en-US" ? `${minutes} min` : `${minutes} 分钟` }}</option>
-        </select>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("上次刷新") }}</span>
-        <span class="row-val">{{ lastRefresh }}</span>
-        <button class="btn-mini" :disabled="loading" @click="refresh()">{{ loading ? t("刷新中…") : t("立即刷新") }}</button>
-      </div>
-      <div class="row">
-        <span class="row-name">{{ t("历史保留") }}</span>
-        <select v-model.number="historyRetentionDays" @change="onRetentionChange">
-          <option v-for="days in [7, 30, 90, 365]" :key="days" :value="days">{{ days === 365 ? (locale === "en-US" ? "1 year" : "1 年") : (locale === "en-US" ? `${days} days` : `${days} 天`) }}</option>
-        </select>
-      </div>
+        <template v-if="activeTab === 'stats'">
+          <StatsPanel
+            :history-points="historyPoints"
+            :ui-theme="uiTheme"
+            @open-history="invoke('open_history')"
+          />
+        </template>
 
-      </template>
+        <template v-if="activeTab === 'reset'">
+          <div class="group-label">{{ t("限额重置") }}</div>
+          <ResetCreditsCard
+            :summary="resetCredits"
+            :loading="resetCreditsLoading"
+            :error="resetCreditsError"
+            @refresh="refreshResetCredits"
+            @consume="consumeResetCredit"
+          />
+        </template>
 
-      <template v-if="activeTab==='stats'">
-        <StatsPanel :history-points="historyPoints" :ui-theme="uiTheme" @open-history="invoke('open_history')" />
-      </template>
+        <template v-if="activeTab === 'system'">
+          <div class="group-label">{{ t("系统") }}</div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("显示胶囊") }}</span>
+            <button
+              class="switch"
+              :class="{ on: capsuleVisible }"
+              @click="onCapsuleVisibilityChange()"
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("开机自启") }}</span>
+            <button
+              class="switch"
+              :class="{ on: autostart }"
+              @click="
+                autostart = !autostart;
+                onAutostartChange();
+              "
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("托盘图标") }}</span>
+            <div class="seg" aria-label="托盘图标样式">
+              <button
+                :class="{ on: trayIconMode === 'logo' }"
+                @click="onTrayIconModeChange('logo')"
+              >
+                Logo
+              </button>
+              <button
+                :class="{ on: trayIconMode === 'usage' }"
+                @click="onTrayIconModeChange('usage')"
+              >
+                {{ t("用量环") }}
+              </button>
+            </div>
+          </div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("低额度通知") }}</span>
+            <button
+              class="switch"
+              :class="{ on: notificationsEnabled }"
+              @click="
+                notificationsEnabled = !notificationsEnabled;
+                onNotificationChange();
+              "
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
+          <div v-if="notificationsEnabled" class="row row-flat">
+            <span class="row-name">{{ t("提醒阈值") }}</span>
+            <select
+              v-model.number="notificationThreshold"
+              @change="onNotificationThresholdChange"
+            >
+              <option :value="10">10%</option>
+              <option :value="20">20%</option>
+              <option :value="30">30%</option>
+            </select>
+          </div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("全局快捷键") }}</span>
+            <input
+              class="shortcut-input"
+              :value="globalShortcut"
+              :aria-label="t('全局快捷键')"
+              readonly
+              @keydown="onShortcutKeydown"
+            />
+            <button
+              class="switch"
+              :class="{ on: shortcutEnabled }"
+              @click="onShortcutChange()"
+            >
+              <span class="knob"></span>
+            </button>
+          </div>
 
-      <template v-if="activeTab==='reset'">
-        <div class="group-label">{{ t("限额重置") }}</div>
-        <ResetCreditsCard
-          :summary="resetCredits"
-          :loading="resetCreditsLoading"
-          :error="resetCreditsError"
-          @refresh="refreshResetCredits"
-          @consume="consumeResetCredit"
-        />
-      </template>
+          <div class="group-label">{{ t("诊断与更新") }}</div>
+          <div class="row row-flat system-actions">
+            <button class="btn-mini" @click="startLogin">
+              {{ t("重新登录") }}
+            </button>
+            <button class="btn-mini" @click="runDiagnostics">
+              {{ t("连接诊断") }}
+            </button>
+            <button class="btn-mini" @click="checkForUpdates">
+              {{ t("检查更新") }}
+            </button>
+          </div>
+          <p v-if="systemMessage" class="system-message">{{ systemMessage }}</p>
 
-      <template v-if="activeTab==='system'">
-      <div class="group-label">{{ t("系统") }}</div>
-      <div class="row row-flat">
-        <span class="row-name">{{ t("显示胶囊") }}</span>
-        <button class="switch" :class="{ on: capsuleVisible }" @click="onCapsuleVisibilityChange()">
-          <span class="knob"></span>
-        </button>
-      </div>
-      <div class="row row-flat">
-        <span class="row-name">{{ t("开机自启") }}</span>
-        <button class="switch" :class="{ on: autostart }" @click="autostart = !autostart; onAutostartChange()">
-          <span class="knob"></span>
-        </button>
-      </div>
-      <div class="row row-flat">
-        <span class="row-name">{{ t("托盘图标") }}</span>
-        <div class="seg" aria-label="托盘图标样式">
-          <button :class="{ on: trayIconMode === 'logo' }" @click="onTrayIconModeChange('logo')">Logo</button>
-          <button :class="{ on: trayIconMode === 'usage' }" @click="onTrayIconModeChange('usage')">{{ t("用量环") }}</button>
-        </div>
-      </div>
-      <div class="row row-flat">
-        <span class="row-name">{{ t("低额度通知") }}</span>
-        <button class="switch" :class="{ on: notificationsEnabled }" @click="notificationsEnabled = !notificationsEnabled; onNotificationChange()"><span class="knob"></span></button>
-      </div>
-      <div v-if="notificationsEnabled" class="row row-flat">
-        <span class="row-name">{{ t("提醒阈值") }}</span>
-        <select v-model.number="notificationThreshold" @change="onNotificationThresholdChange"><option :value="10">10%</option><option :value="20">20%</option><option :value="30">30%</option></select>
-      </div>
-      <div class="row row-flat">
-        <span class="row-name">{{ t("全局快捷键") }}</span>
-        <input class="shortcut-input" :value="globalShortcut" :aria-label="t('全局快捷键')" readonly @keydown="onShortcutKeydown" />
-        <button class="switch" :class="{ on: shortcutEnabled }" @click="onShortcutChange()"><span class="knob"></span></button>
-      </div>
-
-      <div class="group-label">{{ t("诊断与更新") }}</div>
-      <div class="row row-flat system-actions">
-        <button class="btn-mini" @click="startLogin">{{ t("重新登录") }}</button>
-        <button class="btn-mini" @click="runDiagnostics">{{ t("连接诊断") }}</button>
-        <button class="btn-mini" @click="checkForUpdates">{{ t("检查更新") }}</button>
-      </div>
-      <p v-if="systemMessage" class="system-message">{{ systemMessage }}</p>
-
-      <div class="group-label">{{ t("关于") }}</div>
-      <div class="row row-flat"><span class="row-name">{{ t("版本") }}</span><span class="row-val">v1.0.0</span></div>
-      <div class="row row-flat privacy-row">
-        <div class="privacy-heading">
-          <span class="row-name">{{ t("隐私") }}</span>
-          <span class="privacy-badge">{{ t("仅本地处理") }}</span>
-        </div>
-        <p class="privacy-summary">{{ t("Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。") }}</p>
-        <ul class="privacy-list">
-          <li v-for="item in [['认证信息','仅在本机读取 Codex 登录凭据；访问令牌不会显示在界面或写入历史记录。'],['网络请求','仅用于向 ChatGPT 官方接口获取额度与用量统计，不会发送给第三方服务。'],['本地数据','偏好设置和额度采样保存在本机，可通过“恢复默认”或“清除历史”删除。'],['CSV 导出','只有你主动选择保存位置时才会生成文件，应用不会自动上传导出内容。'],['遥测','应用不包含广告、用户追踪或后台遥测。']]" :key="item[0]"><strong>{{ t(item[0]) }}</strong><span>{{ t(item[1]) }}</span></li>
-        </ul>
-      </div>
-      <div class="row row-flat"><span class="row-name">{{ t("许可证") }}</span><span class="row-val">MIT</span></div>
-      </template>
-
+          <div class="group-label">{{ t("关于") }}</div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("版本") }}</span
+            ><span class="row-val">v1.0.0</span>
+          </div>
+          <div class="row row-flat privacy-row">
+            <div class="privacy-heading">
+              <span class="row-name">{{ t("隐私") }}</span>
+              <span class="privacy-badge">{{ t("仅本地处理") }}</span>
+            </div>
+            <p class="privacy-summary">
+              {{
+                t(
+                  "Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。",
+                )
+              }}
+            </p>
+            <ul class="privacy-list">
+              <li
+                v-for="item in [
+                  [
+                    '认证信息',
+                    '仅在本机读取 Codex 登录凭据；访问令牌不会显示在界面或写入历史记录。',
+                  ],
+                  [
+                    '网络请求',
+                    '仅用于向 ChatGPT 官方接口获取额度与用量统计，不会发送给第三方服务。',
+                  ],
+                  [
+                    '本地数据',
+                    '偏好设置和额度采样保存在本机，可通过“恢复默认”或“清除历史”删除。',
+                  ],
+                  [
+                    'CSV 导出',
+                    '只有你主动选择保存位置时才会生成文件，应用不会自动上传导出内容。',
+                  ],
+                  ['遥测', '应用不包含广告、用户追踪或后台遥测。'],
+                ]"
+                :key="item[0]"
+              >
+                <strong>{{ t(item[0]) }}</strong
+                ><span>{{ t(item[1]) }}</span>
+              </li>
+            </ul>
+          </div>
+          <div class="row row-flat">
+            <span class="row-name">{{ t("许可证") }}</span
+            ><span class="row-val">MIT</span>
+          </div>
+        </template>
       </div>
     </div>
 
     <div class="panel-foot">
-      <button class="btn-mini btn-secondary" @click="resetDefaults()">{{ t("恢复默认") }}</button>
-      <button class="btn-mini btn-danger" @click="onQuit()">{{ t("退出应用") }}</button>
+      <button class="btn-mini btn-secondary" @click="resetDefaults()">
+        {{ t("恢复默认") }}
+      </button>
+      <button class="btn-mini btn-danger" @click="onQuit()">
+        {{ t("退出应用") }}
+      </button>
     </div>
 
     <div class="resize-handle" @mousedown="onPanelResizeStart"></div>
@@ -963,14 +1476,17 @@ body {
   overflow: hidden;
   cursor: default;
   transform-origin: center;
-  transition: transform 0.14s ease, border-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.capsule:active {
-  background: transparent;
-  box-shadow: none;
-  filter: brightness(0.96);
-  transform: scale(0.975);
+.capsule-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 140px;
+  height: 34px;
 }
 
 .capsule::before {
@@ -979,7 +1495,12 @@ body {
   z-index: 4;
   inset: 1px 8px auto;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.38),
+    transparent
+  );
   pointer-events: none;
   display: none;
 }
@@ -992,7 +1513,12 @@ body {
   bottom: 6px;
   left: 50%;
   width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
   box-shadow: 1px 0 0 rgba(0, 0, 0, 0.18);
   pointer-events: none;
   display: none;
@@ -1008,8 +1534,14 @@ body {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(49, 51, 63, 0.98), rgba(24, 25, 32, 0.98));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 7px rgba(0, 0, 0, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(49, 51, 63, 0.98),
+    rgba(24, 25, 32, 0.98)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 7px rgba(0, 0, 0, 0.28);
   transition: background-color 0.18s ease;
 }
 
@@ -1020,7 +1552,11 @@ body {
   top: 0;
   bottom: 0;
   width: 0%;
-  background: linear-gradient(90deg, rgba(79, 70, 229, 0.94), rgba(139, 92, 246, 0.96));
+  background: linear-gradient(
+    90deg,
+    rgba(79, 70, 229, 0.94),
+    rgba(139, 92, 246, 0.96)
+  );
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.15);
   transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1028,11 +1564,13 @@ body {
 .fill--red {
   left: 0;
   right: auto;
-  background: linear-gradient(90deg, rgba(255, 138, 101, 0.96), rgba(225, 29, 72, 0.95));
+  background: linear-gradient(
+    90deg,
+    rgba(255, 138, 101, 0.96),
+    rgba(225, 29, 72, 0.95)
+  );
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.13);
 }
-
-.half:active { background: linear-gradient(180deg, rgba(39, 45, 57, 0.98), rgba(22, 26, 34, 0.98)); }
 
 /* 单一外壳；主题只改变左右进度填充。 */
 .capsule {
@@ -1040,24 +1578,45 @@ body {
   padding: 0;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.24), 0 3px 10px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+    0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
-.capsule:active { background: transparent; box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.34), 0 1px 4px rgba(0, 0, 0, 0.26); }
-.capsule::before, .capsule::after { display: block; }
-.capsule .half { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.capsule .half:active { background: rgba(255, 255, 255, 0.16); }
+.capsule::before,
+.capsule::after {
+  display: block;
+}
+.capsule .half {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 
 .capsule-realistic .fill {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 36%, rgba(35, 24, 104, 0.24) 100%),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.36),
+      transparent 36%,
+      rgba(35, 24, 104, 0.24) 100%
+    ),
     linear-gradient(90deg, #4f46e5, #9b87f5);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), inset 0 -2px 3px rgba(35, 24, 104, 0.28);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -2px 3px rgba(35, 24, 104, 0.28);
 }
 
 .capsule-realistic .fill--red {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 36%, rgba(102, 11, 39, 0.22) 100%),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.36),
+      transparent 36%,
+      rgba(102, 11, 39, 0.22) 100%
+    ),
     linear-gradient(90deg, #ff956f, #e11d48);
 }
 
@@ -1067,46 +1626,120 @@ body {
   border-radius: 0;
   padding: 4px 4px 5px;
   background: #090b0e;
-  clip-path: polygon(8% 0,92% 0,92% 12%,96% 12%,96% 24%,100% 24%,100% 76%,96% 76%,96% 88%,92% 88%,92% 100%,8% 100%,8% 88%,4% 88%,4% 76%,0 76%,0 24%,4% 24%,4% 12%,8% 12%);
+  clip-path: polygon(
+    8% 0,
+    92% 0,
+    92% 12%,
+    96% 12%,
+    96% 24%,
+    100% 24%,
+    100% 76%,
+    96% 76%,
+    96% 88%,
+    92% 88%,
+    92% 100%,
+    8% 100%,
+    8% 88%,
+    4% 88%,
+    4% 76%,
+    0 76%,
+    0 24%,
+    4% 24%,
+    4% 12%,
+    8% 12%
+  );
   image-rendering: pixelated;
-  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .52));
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.52));
   box-shadow: none;
 }
 
-.capsule-pixel:active { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .5)) brightness(.96); }
+.capsule-realistic .num {
+  font-family:
+    "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
 
-.capsule-realistic .num { font-family: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.2px; }
+.capsule-pixel::before {
+  display: none;
+}
 
-.capsule-pixel::before { display: none; }
+.capsule-pixel::after {
+  display: none;
+}
 
-.capsule-pixel::after { display: none; }
-
-.capsule-pixel .half { background: #1e2430; }
+.capsule-pixel .half {
+  background: linear-gradient(
+    180deg,
+    #a6afbc 0,
+    #7e8998 22%,
+    #606a78 58%,
+    #48515e 100%
+  );
+}
 .capsule-pixel .left {
   flex: 52;
-  background: linear-gradient(180deg, #737b89 0, #4b525f 22%, #353c49 58%, #252a34 100%);
-  clip-path: polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%);
+  clip-path: polygon(
+    6% 0,
+    100% 0,
+    100% 100%,
+    6% 100%,
+    6% 88%,
+    0 88%,
+    0 12%,
+    6% 12%
+  );
 }
+
 .capsule-pixel .right {
   flex: 48;
-  background: linear-gradient(180deg, #737b89 0, #4b525f 22%, #353c49 58%, #252a34 100%);
-  clip-path: polygon(0 0,94% 0,94% 12%,100% 12%,100% 88%,94% 88%,94% 100%,0 100%);
+  clip-path: polygon(
+    0 0,
+    94% 0,
+    94% 12%,
+    100% 12%,
+    100% 88%,
+    94% 88%,
+    94% 100%,
+    0 100%
+  );
 }
 
 .capsule-pixel .fill {
   background-color: #287cf5;
-  background-image:
-    linear-gradient(180deg, #83c4ff 0, #4b97f8 22%, #2f7df4 62%, #255ed8 100%);
-  box-shadow: inset 0 2px #b9e4ff, inset 0 -3px rgba(11, 48, 139, .52);
+  background-image: linear-gradient(
+    180deg,
+    #83c4ff 0,
+    #4b97f8 22%,
+    #2f7df4 62%,
+    #255ed8 100%
+  );
+  box-shadow:
+    inset 0 2px #b9e4ff,
+    inset 0 -3px rgba(11, 48, 139, 0.52);
 }
 
 .capsule-pixel .fill--red {
   background-color: #20252e;
-  background-image: linear-gradient(180deg, #596170 0, #3d4552 24%, #292f3a 58%, #171b22 100%);
-  box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.48);
+  background-image: linear-gradient(
+    180deg,
+    #596170 0,
+    #3d4552 24%,
+    #292f3a 58%,
+    #171b22 100%
+  );
+  box-shadow:
+    inset 0 2px rgba(255, 255, 255, 0.22),
+    inset 0 -3px rgba(0, 0, 0, 0.48);
 }
 
-.capsule-pixel .num { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: calc(var(--num-size, 13px) * 1.08); font-weight: 800; letter-spacing: -.35px; text-shadow: 1px 1px 0 rgba(14, 20, 33, .72); }
+.capsule-pixel .num {
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-size: calc(var(--num-size, 13px) * 1.08);
+  font-weight: 800;
+  letter-spacing: -0.35px;
+  text-shadow: 1px 1px 0 rgba(14, 20, 33, 0.72);
+}
 
 .capsule-flat {
   border: 0;
@@ -1114,37 +1747,82 @@ body {
   box-shadow: none;
 }
 
-.capsule-flat .fill { background: #3787f7; box-shadow: none; }
-.capsule-flat .fill--red { background: #111318; box-shadow: none; }
-.capsule-flat::before, .capsule-flat::after { display: none; }
-.capsule-flat .num { font-family: Arial, "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: 0; text-shadow: none; }
+.capsule-flat .fill {
+  background: #3787f7;
+  box-shadow: none;
+}
+.capsule-flat .fill--red {
+  background: #111318;
+  box-shadow: none;
+}
+.capsule-flat::before,
+.capsule-flat::after {
+  display: none;
+}
+.capsule-flat .num {
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-shadow: none;
+}
 
 .capsule-skeuomorphic {
   border-color: rgba(149, 164, 188, 0.82);
   background: transparent;
-  box-shadow: inset 0 2px 3px rgba(255,255,255,.48), inset 0 -3px 5px rgba(0,0,0,.52), 0 5px 9px rgba(0,0,0,.42);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.48),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.52),
+    0 5px 9px rgba(0, 0, 0, 0.42);
 }
 
-.capsule-skeuomorphic .fill { background: linear-gradient(180deg, #b9efff, #2964f1 62%, #3420c8); box-shadow: inset 0 2px 2px rgba(255,255,255,.46); }
-.capsule-skeuomorphic .fill--red { background: linear-gradient(180deg, #596175, #171b28); }
-.capsule-skeuomorphic .num { font-family: "Trebuchet MS", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.3px; text-shadow: 0 2px 2px rgba(0,0,0,.6); }
+.capsule-skeuomorphic .fill {
+  background: linear-gradient(180deg, #b9efff, #2964f1 62%, #3420c8);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.46);
+}
+.capsule-skeuomorphic .fill--red {
+  background: linear-gradient(180deg, #596175, #171b28);
+}
+.capsule-skeuomorphic .num {
+  font-family: "Trebuchet MS", "Microsoft YaHei", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.6);
+}
 
 .capsule-jelly {
   border-color: rgba(145, 234, 255, 0.82);
   background: transparent;
-  box-shadow: inset 0 3px 3px rgba(255,255,255,.56), inset 0 -3px 5px rgba(22,52,160,.6), 0 0 8px rgba(74,207,255,.46);
+  box-shadow:
+    inset 0 3px 3px rgba(255, 255, 255, 0.56),
+    inset 0 -3px 5px rgba(22, 52, 160, 0.6),
+    0 0 8px rgba(74, 207, 255, 0.46);
 }
 
-.capsule-jelly .fill { background: linear-gradient(90deg, #3687ff, #736dff); box-shadow: inset 0 2px 2px rgba(255,255,255,.42); }
-.capsule-jelly .fill--red { background: linear-gradient(90deg, #8b62ff, #f244a9); }
-.capsule-jelly .num { font-family: "Arial Rounded MT Bold", "Segoe UI", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.35px; text-shadow: 0 1px 2px rgba(58,33,128,.66); }
+.capsule-jelly .fill {
+  background: linear-gradient(90deg, #3687ff, #736dff);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.42);
+}
+.capsule-jelly .fill--red {
+  background: linear-gradient(90deg, #8b62ff, #f244a9);
+}
+.capsule-jelly .num {
+  font-family:
+    "Arial Rounded MT Bold", "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.35px;
+  text-shadow: 0 1px 2px rgba(58, 33, 128, 0.66);
+}
 
 .capsule-neon {
   border: 2px solid transparent;
   background:
     linear-gradient(transparent, transparent) padding-box,
     linear-gradient(100deg, #42dfff 0%, #985cff 50%, #ff62c7 100%) border-box;
-  box-shadow: -2px 0 7px rgba(66,223,255,.6), 2px 0 7px rgba(255,98,199,.53), 0 0 12px rgba(122,53,255,.82), inset 0 0 8px rgba(19,28,85,.7);
+  box-shadow:
+    -2px 0 7px rgba(66, 223, 255, 0.6),
+    2px 0 7px rgba(255, 98, 199, 0.53),
+    0 0 12px rgba(122, 53, 255, 0.82),
+    inset 0 0 8px rgba(19, 28, 85, 0.7);
 }
 
 .capsule-neon::after {
@@ -1155,29 +1833,56 @@ body {
   box-shadow: 0 0 5px #e053ff;
 }
 
-.capsule-neon .fill { background: linear-gradient(90deg, #073d72, #302070); box-shadow: inset 0 0 8px rgba(53,220,255,.33); }
-.capsule-neon .fill--red { background: linear-gradient(90deg, #38196d, #711452); box-shadow: inset 0 0 8px rgba(255,79,203,.33); }
-.capsule-neon .num { color: #fff; font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif; font-weight: 600; letter-spacing: .35px; text-shadow: 0 0 4px #86eaff, 0 0 8px #945cff; }
-
-.speed-outline {
-  position: absolute;
-  z-index: 12;
-  inset: 1px;
-  box-sizing: border-box;
-  padding: 2px;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--speed-left) 0 49%, var(--speed-right) 51% 100%);
-  pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+.capsule-neon .fill {
+  background: linear-gradient(90deg, #073d72, #302070);
+  box-shadow: inset 0 0 8px rgba(53, 220, 255, 0.33);
+}
+.capsule-neon .fill--red {
+  background: linear-gradient(90deg, #38196d, #711452);
+  box-shadow: inset 0 0 8px rgba(255, 79, 203, 0.33);
+}
+.capsule-neon .num {
+  color: #fff;
+  font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.35px;
+  text-shadow:
+    0 0 4px #86eaff,
+    0 0 8px #945cff;
 }
 
-.capsule-pixel .speed-outline {
-  inset: 4px;
-  padding: 2px;
-  border-radius: 2px;
+.speed-indicators {
+  position: absolute;
+  z-index: 12;
+  inset: 0;
+  pointer-events: none;
+}
+
+.speed-indicator {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(8, 11, 16, 0.86);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.56);
+  transform: translateY(-50%);
+}
+
+.speed-indicator--left {
+  left: 0;
+  background: var(--speed-left);
+}
+.speed-indicator--right {
+  right: 0;
+  background: var(--speed-right);
+}
+
+.capsule-pixel .speed-indicator {
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px #090b0e,
+    0 1px 1px rgba(0, 0, 0, 0.5);
 }
 
 .num {
@@ -1197,7 +1902,9 @@ body {
   line-height: 1;
   text-align: center;
   pointer-events: none;
-  transition: transform 0.18s ease, opacity 0.15s ease;
+  transition:
+    transform 0.18s ease,
+    opacity 0.15s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1233,7 +1940,9 @@ body {
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
   margin-top: 6px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(20px);
   overflow: hidden;
 }
@@ -1250,7 +1959,9 @@ body {
   user-select: none;
 }
 
-.panel-head:active { cursor: grabbing; }
+.panel-head:active {
+  cursor: grabbing;
+}
 
 .panel-heading {
   display: flex;
@@ -1351,12 +2062,18 @@ body {
   font-size: 12px;
   cursor: pointer;
   border-radius: 6px;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
-.tab svg { flex-shrink: 0; }
+.tab svg {
+  flex-shrink: 0;
+}
 
-.tab:hover { background: rgba(255, 255, 255, 0.055); }
+.tab:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
 
 .tab.on {
   background: var(--panel-bg-active, rgba(255, 255, 255, 0.09));
@@ -1471,7 +2188,9 @@ body {
   border-color: #f1f1f1;
 }
 
-.switch.on .knob { background: #181818; }
+.switch.on .knob {
+  background: #181818;
+}
 
 .switch.on .knob {
   left: 16px;
@@ -1586,15 +2305,19 @@ body {
 .kpi {
   background: rgba(107, 138, 240, 0.1);
   border: 1px solid rgba(107, 138, 240, 0.25);
-  border-radius: 8px; padding: 9px 6px; text-align: center;
+  border-radius: 8px;
+  padding: 9px 6px;
+  text-align: center;
 }
-.kpi-val { font-size: 13px;
+.kpi-val {
+  font-size: 13px;
   font-weight: 700;
   color: #fff;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
-.kpi-lbl { font-size: 7px;
+.kpi-lbl {
+  font-size: 7px;
   color: var(--panel-val, #888);
   margin-top: 2px;
 }
@@ -1647,8 +2370,18 @@ body {
   font-weight: 600;
 }
 
-.system-actions { flex-wrap: wrap; justify-content: flex-end; }
-.system-message { color: var(--panel-val, #8f97a8); font-size: 10px; line-height: 1.5; padding: 2px; word-break: break-all; user-select: text; }
+.system-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.system-message {
+  color: var(--panel-val, #8f97a8);
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 2px;
+  word-break: break-all;
+  user-select: text;
+}
 
 .chart-axis {
   display: flex;
@@ -1673,7 +2406,12 @@ body {
   color: var(--panel-secondary-text, var(--panel-text, #ddd));
   border-color: var(--panel-secondary-border, rgba(255, 255, 255, 0.14));
   background: var(--panel-secondary-bg, rgba(255, 255, 255, 0.07));
-  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .btn-secondary:hover {
@@ -1693,7 +2431,12 @@ body {
   color: var(--panel-danger-text, #ef9a9a);
   border-color: var(--panel-danger-border, rgba(239, 100, 100, 0.28));
   background: var(--panel-danger-bg, rgba(239, 100, 100, 0.08));
-  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .btn-danger:hover {
@@ -1717,7 +2460,7 @@ body {
   outline-offset: 2px;
 }
 
-.capsule-right {
+.capsule-shell-right {
   position: absolute;
   right: 0;
 }
@@ -1731,8 +2474,14 @@ body {
   position: absolute;
   left: 2px;
   bottom: 2px;
-  width: 20px; height: 20px; cursor: nesw-resize;
-  background: linear-gradient(225deg, transparent 50%, rgba(255,255,255,0.25) 50%);
+  width: 20px;
+  height: 20px;
+  cursor: nesw-resize;
+  background: linear-gradient(
+    225deg,
+    transparent 50%,
+    rgba(255, 255, 255, 0.25) 50%
+  );
 }
 
 html[data-ui-theme="light"] .panel {
@@ -1758,7 +2507,9 @@ html[data-ui-theme="light"] .panel {
   --panel-secondary-hover-text: #1d2939;
   --panel-secondary-hover-border: rgba(20, 28, 42, 0.24);
   --panel-secondary-hover: rgba(20, 28, 42, 0.09);
-  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 16px 40px rgba(16, 24, 40, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 html[data-ui-theme="light"] .panel-head,
@@ -1767,25 +2518,80 @@ html[data-ui-theme="light"] .panel-foot {
   border-color: rgba(20, 28, 42, 0.09);
 }
 
-html[data-ui-theme="light"] .row { color: #344054; background: transparent; border-color: rgba(20, 28, 42, 0.07); }
+html[data-ui-theme="light"] .row {
+  color: #344054;
+  background: transparent;
+  border-color: rgba(20, 28, 42, 0.07);
+}
 
-html[data-ui-theme="light"] .row.row-flat { background: transparent; border-color: transparent; }
-html[data-ui-theme="light"] .tab:hover { background: rgba(20, 28, 42, 0.05); }
-html[data-ui-theme="light"] .panel-close { color: #667085; }
-html[data-ui-theme="light"] .panel-close:hover { background: rgba(20, 28, 42, 0.08); color: #1d2433; }
-html[data-ui-theme="light"] .switch { background: rgba(20, 28, 42, 0.12); border-color: rgba(20, 28, 42, 0.16); }
-html[data-ui-theme="light"] .switch.on { background: #242424; border-color: #242424; }
-html[data-ui-theme="light"] .switch.on .knob { background: #fff; }
-html[data-ui-theme="light"] .seg { border-color: rgba(20, 28, 42, 0.18); }
-html[data-ui-theme="light"] .seg button { color: #667085; }
-html[data-ui-theme="light"] .seg button.on { background: #242424; color: #fff; }
-html[data-ui-theme="light"] .panel select { background: #fff; color: #344054; border-color: rgba(20, 28, 42, 0.16); }
-html[data-ui-theme="light"] .panel select option { background: #fff; color: #344054; }
-html[data-ui-theme="light"] .shortcut-input { background: #fff; color: #344054; border-color: rgba(20, 28, 42, 0.16); }
+html[data-ui-theme="light"] .row.row-flat {
+  background: transparent;
+  border-color: transparent;
+}
+html[data-ui-theme="light"] .tab:hover {
+  background: rgba(20, 28, 42, 0.05);
+}
+html[data-ui-theme="light"] .panel-close {
+  color: #667085;
+}
+html[data-ui-theme="light"] .panel-close:hover {
+  background: rgba(20, 28, 42, 0.08);
+  color: #1d2433;
+}
+html[data-ui-theme="light"] .switch {
+  background: rgba(20, 28, 42, 0.12);
+  border-color: rgba(20, 28, 42, 0.16);
+}
+html[data-ui-theme="light"] .switch.on {
+  background: #242424;
+  border-color: #242424;
+}
+html[data-ui-theme="light"] .switch.on .knob {
+  background: #fff;
+}
+html[data-ui-theme="light"] .seg {
+  border-color: rgba(20, 28, 42, 0.18);
+}
+html[data-ui-theme="light"] .seg button {
+  color: #667085;
+}
+html[data-ui-theme="light"] .seg button.on {
+  background: #242424;
+  color: #fff;
+}
+html[data-ui-theme="light"] .panel select {
+  background: #fff;
+  color: #344054;
+  border-color: rgba(20, 28, 42, 0.16);
+}
+html[data-ui-theme="light"] .panel select option {
+  background: #fff;
+  color: #344054;
+}
+html[data-ui-theme="light"] .shortcut-input {
+  background: #fff;
+  color: #344054;
+  border-color: rgba(20, 28, 42, 0.16);
+}
 html[data-ui-theme="light"] .shortcut-input:hover,
-html[data-ui-theme="light"] .shortcut-input:focus { background: #f7f7f6; border-color: rgba(20, 28, 42, 0.36); }
-html[data-ui-theme="light"] .panel-foot { background: rgba(20, 28, 42, 0.025); }
-html[data-ui-theme="light"] .kpi-val { color: #1d2433; }
-html[data-ui-theme="light"] .panel-body::-webkit-scrollbar-thumb { background: rgba(20, 28, 42, 0.18); }
-html[data-ui-theme="light"] .resize-handle { background: linear-gradient(225deg, transparent 50%, rgba(20, 28, 42, 0.2) 50%); }
+html[data-ui-theme="light"] .shortcut-input:focus {
+  background: #f7f7f6;
+  border-color: rgba(20, 28, 42, 0.36);
+}
+html[data-ui-theme="light"] .panel-foot {
+  background: rgba(20, 28, 42, 0.025);
+}
+html[data-ui-theme="light"] .kpi-val {
+  color: #1d2433;
+}
+html[data-ui-theme="light"] .panel-body::-webkit-scrollbar-thumb {
+  background: rgba(20, 28, 42, 0.18);
+}
+html[data-ui-theme="light"] .resize-handle {
+  background: linear-gradient(
+    225deg,
+    transparent 50%,
+    rgba(20, 28, 42, 0.2) 50%
+  );
+}
 </style>

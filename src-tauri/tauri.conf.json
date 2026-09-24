@@ -16,7 +16,7 @@
         "title": "Codex Capsule",
         "width": 300,
         "height": 225,
-        "minWidth": 100,
+        "minWidth": 140,
         "minHeight": 34,
         "resizable": false,
         "maximizable": false,
