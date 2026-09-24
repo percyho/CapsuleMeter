@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { ref, reactive, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -30,7 +30,11 @@ import type {
   UsageData,
   WindowData,
 } from "./types/usage";
-import { parseCapsuleTheme, type CapsuleTheme } from "./types/capsule-theme";
+import {
+  capsuleThemeOptions,
+  parseCapsuleTheme,
+  type CapsuleTheme,
+} from "./types/capsule-theme";
 import {
   evaluateConsumptionSpeed,
   type ConsumptionSpeedState,
@@ -97,8 +101,93 @@ let rightTimer: number | undefined;
 // —— 可配置项（localStorage 持久化）——
 const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
 const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
+type CapsuleColorValues = {
+  background: string;
+  leftFill: string;
+  rightFill: string;
+};
+type CapsuleThemeColorOverrides = Partial<
+  Record<CapsuleTheme, CapsuleColorValues>
+>;
+
 const storedCapsuleStyle = localStorage.getItem("capsuleStyle");
 const capsuleStyle = ref<CapsuleTheme>(parseCapsuleTheme(storedCapsuleStyle));
+
+function normalizeStoredColor(value: unknown): string {
+  return typeof value === "string" && /^#[\da-f]{6}$/i.test(value)
+    ? value
+    : "";
+}
+
+function readCapsuleThemeColors(): CapsuleThemeColorOverrides {
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem("capsuleThemeColors") ?? "{}",
+    ) as Record<string, Partial<CapsuleColorValues>>;
+    return Object.fromEntries(
+      capsuleThemeOptions.map(({ id }) => {
+        const colors = stored[id] ?? {};
+        return [
+          id,
+          {
+            background: normalizeStoredColor(colors.background),
+            leftFill: normalizeStoredColor(colors.leftFill),
+            rightFill: normalizeStoredColor(colors.rightFill),
+          },
+        ];
+      }),
+    ) as CapsuleThemeColorOverrides;
+  } catch {
+    return {};
+  }
+}
+
+const capsuleThemeColors = reactive<CapsuleThemeColorOverrides>(
+  readCapsuleThemeColors(),
+);
+const legacyCapsuleColors = {
+  background: normalizeStoredColor(localStorage.getItem("capsuleBackgroundColor")),
+  leftFill: normalizeStoredColor(localStorage.getItem("capsuleLeftFillColor")),
+  rightFill: normalizeStoredColor(localStorage.getItem("capsuleRightFillColor")),
+};
+if (Object.values(legacyCapsuleColors).some(Boolean)) {
+  const currentThemeColors = capsuleThemeColors[capsuleStyle.value] ?? {
+    background: "",
+    leftFill: "",
+    rightFill: "",
+  };
+  capsuleThemeColors[capsuleStyle.value] = {
+    background: currentThemeColors.background || legacyCapsuleColors.background,
+    leftFill: currentThemeColors.leftFill || legacyCapsuleColors.leftFill,
+    rightFill: currentThemeColors.rightFill || legacyCapsuleColors.rightFill,
+  };
+  localStorage.setItem("capsuleThemeColors", JSON.stringify(capsuleThemeColors));
+  ["capsuleBackgroundColor", "capsuleLeftFillColor", "capsuleRightFillColor"]
+    .forEach((key) => localStorage.removeItem(key));
+}
+
+const capsuleColors = reactive<CapsuleColorValues>({
+  ...(capsuleThemeColors[capsuleStyle.value] ?? {
+    background: "",
+    leftFill: "",
+    rightFill: "",
+  }),
+});
+const capsuleBackgroundStyle = computed(() =>
+  capsuleColors.background
+    ? { backgroundColor: capsuleColors.background, backgroundImage: "none" }
+    : {},
+);
+const leftFillColorStyle = computed(() =>
+  capsuleColors.leftFill
+    ? { backgroundColor: capsuleColors.leftFill, backgroundImage: "none" }
+    : {},
+);
+const rightFillColorStyle = computed(() =>
+  capsuleColors.rightFill
+    ? { backgroundColor: capsuleColors.rightFill, backgroundImage: "none" }
+    : {},
+);
 const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
 const { locale, setLocale, t } = useLocale();
 const activeTab = ref("appearance");
@@ -544,9 +633,33 @@ function onFontSizeChange() {
   applyWindowSettings();
 }
 
+function onCapsuleColorChange(
+  color: keyof typeof capsuleColors,
+  event: Event,
+) {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  capsuleColors[color] = event.target.value;
+  capsuleThemeColors[capsuleStyle.value] = { ...capsuleColors };
+  localStorage.setItem("capsuleThemeColors", JSON.stringify(capsuleThemeColors));
+}
+
+function resetCapsuleColors() {
+  capsuleColors.background = "";
+  capsuleColors.leftFill = "";
+  capsuleColors.rightFill = "";
+  delete capsuleThemeColors[capsuleStyle.value];
+  localStorage.setItem("capsuleThemeColors", JSON.stringify(capsuleThemeColors));
+  ["capsuleBackgroundColor", "capsuleLeftFillColor", "capsuleRightFillColor"]
+    .forEach((key) => localStorage.removeItem(key));
+}
+
 function setCapsuleStyle(style: CapsuleTheme) {
   capsuleStyle.value = style;
   localStorage.setItem("capsuleStyle", style);
+  const colors = capsuleThemeColors[style];
+  capsuleColors.background = colors?.background ?? "";
+  capsuleColors.leftFill = colors?.leftFill ?? "";
+  capsuleColors.rightFill = colors?.rightFill ?? "";
 }
 
 // —— 行为 ——
@@ -753,6 +866,10 @@ function onContextMenu(e: MouseEvent) {
 function resetDefaults() {
   opacity.value = 0.72;
   fontSize.value = 13;
+  capsuleColors.background = "";
+  capsuleColors.leftFill = "";
+  capsuleColors.rightFill = "";
+  capsuleThemeOptions.forEach(({ id }) => delete capsuleThemeColors[id]);
   capsuleStyle.value = "flat";
   uiTheme.value = "dark";
   setLocale("zh-CN");
@@ -772,6 +889,10 @@ function resetDefaults() {
   [
     "opacity",
     "fontSize",
+    "capsuleThemeColors",
+    "capsuleBackgroundColor",
+    "capsuleLeftFillColor",
+    "capsuleRightFillColor",
     "capsuleStyle",
     "uiTheme",
     "appLocale",
@@ -861,8 +982,16 @@ onBeforeUnmount(() => {
       class="capsule"
       :class="[{ error: lastError }, `capsule-${capsuleStyle}`]"
     >
-      <div class="half left" @click="onLeftClick" :title="leftTitle">
-        <div class="fill" :style="{ width: leftFillWidth }"></div>
+      <div
+        class="half left"
+        :style="capsuleBackgroundStyle"
+        @click="onLeftClick"
+        :title="leftTitle"
+      >
+        <div
+          class="fill"
+          :style="{ width: leftFillWidth, ...leftFillColorStyle }"
+        ></div>
         <span
           v-show="showUsageValues || showLeftReset"
           class="num"
@@ -870,8 +999,16 @@ onBeforeUnmount(() => {
           >{{ leftDisplay }}</span
         >
       </div>
-      <div class="half right" @click="onRightClick" :title="rightTitle">
-        <div class="fill fill--red" :style="{ width: rightFillWidth }"></div>
+      <div
+        class="half right"
+        :style="capsuleBackgroundStyle"
+        @click="onRightClick"
+        :title="rightTitle"
+      >
+        <div
+          class="fill fill--red"
+          :style="{ width: rightFillWidth, ...rightFillColorStyle }"
+        ></div>
         <span
           v-show="showUsageValues || showRightReset"
           class="num"
@@ -1131,11 +1268,56 @@ onBeforeUnmount(() => {
               <span class="knob"></span>
             </button>
           </div>
+          <div class="group-label color-group-heading">
+            <span>{{ t("胶囊颜色") }}</span>
+            <button class="color-reset" @click="resetCapsuleColors">
+              {{ t("恢复主题默认颜色") }}
+            </button>
+          </div>
+          <label class="row color-row" for="capsule-background-color">
+            <span class="row-name">{{ t("胶囊底色") }}</span>
+            <span class="color-control">
+              <input
+                id="capsule-background-color"
+                type="color"
+                :value="capsuleColors.background || '#30323d'"
+                @input="onCapsuleColorChange('background', $event)"
+              />
+              <span class="color-value">{{ capsuleColors.background || t("主题默认") }}</span>
+            </span>
+          </label>
+          <label class="row color-row" for="capsule-left-fill-color">
+            <span class="row-name">{{ t("左侧填充色") }}</span>
+            <span class="color-control">
+              <input
+                id="capsule-left-fill-color"
+                type="color"
+                :value="capsuleColors.leftFill || '#4f70ef'"
+                @input="onCapsuleColorChange('leftFill', $event)"
+              />
+              <span class="color-value">{{ capsuleColors.leftFill || t("主题默认") }}</span>
+            </span>
+          </label>
+          <label class="row color-row" for="capsule-right-fill-color">
+            <span class="row-name">{{ t("右侧填充色") }}</span>
+            <span class="color-control">
+              <input
+                id="capsule-right-fill-color"
+                type="color"
+                :value="capsuleColors.rightFill || '#e54870'"
+                @input="onCapsuleColorChange('rightFill', $event)"
+              />
+              <span class="color-value">{{ capsuleColors.rightFill || t("主题默认") }}</span>
+            </span>
+          </label>
         </template>
 
         <template v-if="activeTab === 'capsule'">
           <CapsuleThemePanel
             :model-value="capsuleStyle"
+            :theme-colors="capsuleThemeColors"
+            :left-value="leftDisplay"
+            :right-value="rightDisplay"
             :translate="t"
             @select="setCapsuleStyle"
           />
@@ -2094,6 +2276,64 @@ body {
   height: 4px;
   accent-color: #6b8af0;
   min-width: 0;
+}
+
+.color-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.color-reset {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--panel-accent, #7d98f5);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.color-reset:hover {
+  color: var(--panel-title, #f4f6fb);
+}
+
+.color-row {
+  cursor: pointer;
+}
+
+.color-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.color-control input[type="color"] {
+  width: 28px;
+  height: 24px;
+  padding: 2px;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.14));
+  border-radius: 5px;
+  background: var(--panel-control-bg, rgba(255, 255, 255, 0.06));
+  cursor: pointer;
+}
+
+.color-control input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 1px;
+}
+
+.color-control input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 3px;
+}
+
+.color-value {
+  min-width: 76px;
+  color: var(--panel-val, #8f97a8);
+  font: 10px/1.2 ui-monospace, Consolas, monospace;
+  text-align: right;
 }
 
 /* 开关 */

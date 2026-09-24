@@ -1,14 +1,36 @@
 <script setup lang="ts">
-import { capsuleThemeOptions, type CapsuleTheme } from "../../types/capsule-theme";
+import {
+  capsuleThemeOptions,
+  type CapsuleTheme,
+} from "../../types/capsule-theme";
 
-defineProps<{
+type ThemeColorSet = {
+  background?: string;
+  leftFill?: string;
+  rightFill?: string;
+};
+
+const props = defineProps<{
   modelValue: CapsuleTheme;
+  themeColors?: Partial<Record<CapsuleTheme, ThemeColorSet>>;
+  leftValue: string;
+  rightValue: string;
   translate: (key: string) => string;
 }>();
 
 const emit = defineEmits<{
   select: [theme: CapsuleTheme];
 }>();
+
+function previewBackgroundStyle(theme: CapsuleTheme) {
+  const color = props.themeColors?.[theme]?.background;
+  return color ? { backgroundColor: color, backgroundImage: "none" } : undefined;
+}
+
+function previewFillStyle(theme: CapsuleTheme, side: "leftFill" | "rightFill") {
+  const color = props.themeColors?.[theme]?.[side];
+  return color ? { backgroundColor: color, backgroundImage: "none" } : undefined;
+}
 </script>
 
 <template>
@@ -33,8 +55,8 @@ const emit = defineEmits<{
       >
         <span class="preview-stage" aria-hidden="true">
           <span class="preview-capsule" :class="`preview-${option.id}`">
-            <span class="preview-half preview-left"><span class="preview-fill"></span><span class="preview-num">72</span></span>
-            <span class="preview-half preview-right"><span class="preview-fill"></span><span class="preview-num">41</span></span>
+            <span class="preview-half preview-left" :style="previewBackgroundStyle(option.id)"><span class="preview-fill" :style="previewFillStyle(option.id, 'leftFill')"></span><span class="preview-num">{{ leftValue }}</span></span>
+            <span class="preview-half preview-right" :style="previewBackgroundStyle(option.id)"><span class="preview-fill" :style="previewFillStyle(option.id, 'rightFill')"></span><span class="preview-num">{{ rightValue }}</span></span>
           </span>
         </span>
         <span class="theme-copy">
