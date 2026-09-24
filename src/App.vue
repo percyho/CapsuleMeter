@@ -1654,8 +1654,7 @@ body {
 }
 
 .capsule-realistic .num {
-  font-family:
-    "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: "Space Grotesk", "Microsoft YaHei", sans-serif;
   font-weight: 700;
   letter-spacing: -0.2px;
 }
@@ -1760,7 +1759,7 @@ body {
   display: none;
 }
 .capsule-flat .num {
-  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-family: Manrope, "Microsoft YaHei", sans-serif;
   font-weight: 700;
   letter-spacing: 0;
   text-shadow: none;
@@ -1783,7 +1782,7 @@ body {
   background: linear-gradient(180deg, #596175, #171b28);
 }
 .capsule-skeuomorphic .num {
-  font-family: "Trebuchet MS", "Microsoft YaHei", sans-serif;
+  font-family: Sora, "Microsoft YaHei", sans-serif;
   font-weight: 700;
   letter-spacing: -0.3px;
   text-shadow: 0 2px 2px rgba(0, 0, 0, 0.6);
@@ -1806,8 +1805,7 @@ body {
   background: linear-gradient(90deg, #8b62ff, #f244a9);
 }
 .capsule-jelly .num {
-  font-family:
-    "Arial Rounded MT Bold", "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: Fredoka, "Microsoft YaHei", sans-serif;
   font-weight: 700;
   letter-spacing: -0.35px;
   text-shadow: 0 1px 2px rgba(58, 33, 128, 0.66);
@@ -1843,7 +1841,7 @@ body {
 }
 .capsule-neon .num {
   color: #fff;
-  font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif;
+  font-family: Oxanium, "Microsoft YaHei", sans-serif;
   font-weight: 600;
   letter-spacing: 0.35px;
   text-shadow:
