@@ -24,16 +24,18 @@ A compact 100×30 desktop widget that displays the remaining usage for the local
   - Drag the lower-left corner to resize the panel freely. The size is saved automatically.
   - **Interface theme**: Light, dark, or system theme.
   - **Language**: Switch instantly between Chinese and English.
-  - **Capsule theme**: Choose a realistic theme with highlights and depth or a pixel theme with block-style particles.
+  - **Capsule themes**: Choose from Flat, Skeuomorphic, Pixel Game, and Neon Glow styles. Pixel Game uses Pixelify Sans for its numbers; Chinese text keeps the shared UI font.
+  - **Per-theme colors**: Customize the capsule background and the left/right progress fills for the selected theme. Each theme keeps its own colors, and the theme previews reflect those custom colors and the current usage values.
   - **Opacity**: Adjust the window opacity in real time.
   - **Text size**: Adjust the usage value font size.
-  - **Show usage values**: Hide both usage values and temporary reset times while keeping the progress fills visible.
+  - **Show usage values**: Hide the percentage values while keeping progress fills visible. Clicking either side still temporarily shows its reset time.
   - **Show capsule**: Hide the capsule and restore it later from the tray or with the global shortcut.
   - All settings are saved automatically and restored after restart.
 - **Automatic refresh**: Fetches updated usage from the OpenAI backend every five minutes by default.
 - **Usage history**: Includes quota and token trends, retention settings, manual refresh, clearing, and CSV export.
 - **Usage reset credits**: Shows available reset credits and expiration details, with a two-step confirmation before resetting both weekly and 5-hour limits.
 - **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. The tray icon can use the app logo or dynamic dual usage rings.
+- **Consumption speed**: Two colored indicators outside the capsule show the recent consumption speed for the 5-hour and weekly windows; hover over the corresponding capsule side to see the estimate.
 - **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default. A new key combination can be recorded directly in System settings.
 - **Account information**: Shows the current Codex account below the plan name. The value is read only from local Codex authentication data.
 - **Maintenance tools**: Re-authenticate, run Codex diagnostics, and check Gitee Releases for updates.
@@ -65,21 +67,25 @@ pnpm install
 # Development mode with hot reload
 pnpm tauri dev
 
-# Build and automatically increment the version
-pnpm build:patch   # Bug fix: 1.0.0 → 1.0.1
-pnpm build:minor   # New feature: 1.0.0 → 1.1.0
-pnpm build:major   # Major release: 1.0.0 → 2.0.0
+# Build a Windows NSIS installer and automatically increment the version
+pnpm build:patch   # Patch release: 1.0.1 → 1.0.2
+pnpm build:minor   # Minor release: 1.0.1 → 1.1.0
+pnpm build:major   # Major release: 1.0.1 → 2.0.0
 
 # Increment the version without building
 node scripts/bump-version.js patch   # Or minor / major
 ```
 
-## Build Outputs
+## Release and Build Outputs
+
+The current release is **v1.0.1**. The Windows x64 NSIS installer is produced at:
 
 ```text
 Executable:  src-tauri/target/release/codex-capsule.exe
 Installer:   src-tauri/target/release/bundle/nsis/CodexCapsule_<version>_x64-setup.exe
 ```
+
+The executable and installer are local build artifacts and are not committed to the repository. To publish a release, build the desired version, commit the version changes, create a matching Git tag (for example, `v1.0.2`), and push the commit and tag to the remote repository.
 
 ## Project Structure
 
