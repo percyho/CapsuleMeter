@@ -153,6 +153,7 @@ fn usage_ring_icon(five_hour: f64, weekly: f64) -> tauri::image::Image<'static> 
     let size = 32u32;
     let mut rgba = vec![0u8; (size * size * 4) as usize];
     let tau = std::f64::consts::TAU;
+    let track_color = [209, 213, 219];
     for y in 0..size {
         for x in 0..size {
             let dx = x as f64 - 15.5;
@@ -161,10 +162,10 @@ fn usage_ring_icon(five_hour: f64, weekly: f64) -> tauri::image::Image<'static> 
             let angle = dx.atan2(-dy).rem_euclid(tau);
             let (color, alpha) = if (11.0..=14.5).contains(&distance) {
                 let active = angle <= weekly.clamp(0.0, 100.0) / 100.0 * tau;
-                (if active { [240, 92, 104] } else { [78, 84, 96] }, 255)
+                (if active { [240, 92, 104] } else { track_color }, 255)
             } else if (6.0..=9.5).contains(&distance) {
                 let active = angle <= five_hour.clamp(0.0, 100.0) / 100.0 * tau;
-                (if active { [66, 164, 245] } else { [78, 84, 96] }, 255)
+                (if active { [66, 164, 245] } else { track_color }, 255)
             } else {
                 ([0, 0, 0], 0)
             };
@@ -212,6 +213,16 @@ fn update_tray_icon(
 mod tests {
     use super::usage_ring_icon;
 
+    const TRACK_COLOR: [u8; 4] = [209, 213, 219, 255];
+
+    fn count_pixels(image: &tauri::image::Image<'_>, color: [u8; 4]) -> usize {
+        image
+            .rgba()
+            .chunks_exact(4)
+            .filter(|pixel| *pixel == color)
+            .count()
+    }
+
     #[test]
     fn usage_ring_has_expected_dimensions_and_visible_pixels() {
         let image = usage_ring_icon(50.0, 75.0);
@@ -219,6 +230,21 @@ mod tests {
         assert_eq!(image.height(), 32);
         assert_eq!(image.rgba().len(), 32 * 32 * 4);
         assert!(image.rgba().chunks_exact(4).any(|pixel| pixel[3] > 0));
+    }
+
+    #[test]
+    fn usage_ring_arc_changes_with_remaining_usage() {
+        let low_usage = usage_ring_icon(25.0, 25.0);
+        let high_usage = usage_ring_icon(75.0, 75.0);
+
+        assert!(count_pixels(&low_usage, TRACK_COLOR) > count_pixels(&high_usage, TRACK_COLOR));
+    }
+
+    #[test]
+    fn usage_ring_uses_light_gray_tracks() {
+        let image = usage_ring_icon(0.0, 0.0);
+
+        assert!(count_pixels(&image, TRACK_COLOR) > 0);
     }
 }
 
