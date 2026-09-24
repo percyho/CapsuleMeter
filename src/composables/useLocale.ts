@@ -11,6 +11,7 @@ const en: Record<string, string> = {
   "数据异常": "Data unavailable",
   "未登录": "Signed out",
   "关闭设置": "Close settings",
+  "周重置于": "Weekly reset at",
   "设置分类": "Settings sections",
   "外观": "Appearance",
   "行为": "Behavior",

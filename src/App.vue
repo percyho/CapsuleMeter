@@ -316,6 +316,17 @@ function fmtClock(epochSec: number | null): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function fmtDateTime(epochSec: number): string {
+  return new Intl.DateTimeFormat(locale.value, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: locale.value === "en-US",
+  }).format(new Date(epochSec * 1000));
+}
+
 /** 5 小时窗口始终显示具体重置时刻，跨天也不退化为日期。 */
 function fmtTimeOnly(epochSec: number | null): string {
   if (!epochSec) return "--";
@@ -384,7 +395,9 @@ const leftTitle = computed(() => {
 });
 const rightTitle = computed(() => {
   const w = usage.value?.weekly;
-  const reset = w?.reset_at ? `周重置于 ${fmtClock(w.reset_at)}` : "周用量";
+  const reset = w?.reset_at
+    ? `${t("周重置于")} ${fmtDateTime(w.reset_at)}`
+    : "周用量";
   return `${reset} · ${formatSpeedHint(speedLabels[weeklySpeed.value.state], weeklySpeed.value.percentPerHour)}`;
 });
 
