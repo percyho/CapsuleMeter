@@ -23,9 +23,12 @@ import type {
   WindowData,
 } from "./types/usage";
 import { parseCapsuleTheme, type CapsuleTheme } from "./types/capsule-theme";
+import { evaluateConsumptionSpeed, type ConsumptionSpeedState } from "./utils/consumption-speed";
 
 // —— 整窗按住拖动（移动超过阈值才启动拖动，单击仍触发点击） ——
 const DRAG_THRESHOLD = 4;
+const CAPSULE_WIDTH = 100;
+const CAPSULE_HEIGHT = 34;
 let dragTracking: { sx: number; sy: number; started: boolean } | null = null;
 
 function startWindowDrag() {
@@ -155,6 +158,32 @@ const rightValue = computed(() => {
   return v === null ? "--" : String(Math.round(v));
 });
 
+const speedColors: Record<ConsumptionSpeedState, string> = {
+  unknown: "rgba(148, 163, 184, 0.55)",
+  idle: "#55d6a8",
+  steady: "#55a7ff",
+  fast: "#f5a524",
+  critical: "#ff5d68",
+};
+const speedLabels: Record<ConsumptionSpeedState, string> = {
+  unknown: "速度评估中",
+  idle: "消耗平缓",
+  steady: "消耗正常",
+  fast: "消耗偏快",
+  critical: "消耗过快",
+};
+
+const fiveHourSpeed = computed(() => evaluateConsumptionSpeed(historyPoints.value, "fiveHour"));
+const weeklySpeed = computed(() => evaluateConsumptionSpeed(historyPoints.value, "weekly"));
+const speedOutlineStyle = computed(() => ({
+  "--speed-left": speedColors[fiveHourSpeed.value.state],
+  "--speed-right": speedColors[weeklySpeed.value.state],
+}));
+
+function formatSpeedHint(label: string, percentPerHour: number | null): string {
+  return percentPerHour === null ? label : `${label} · ${percentPerHour.toFixed(1)}%/小时`;
+}
+
 /** 把重置时间戳格式化为准确时间：当天显示 HH:MM，跨天显示 M/D HH:MM */
 function fmtClock(epochSec: number | null): string {
   if (!epochSec) return "--";
@@ -233,11 +262,13 @@ const rightDisplay = computed(() => {
 
 const leftTitle = computed(() => {
   const w = usage.value?.five_hour;
-  return w?.reset_at ? `5h 重置于 ${fmtClock(w.reset_at)}` : "";
+  const reset = w?.reset_at ? `5h 重置于 ${fmtClock(w.reset_at)}` : "5h 用量";
+  return `${reset} · ${formatSpeedHint(speedLabels[fiveHourSpeed.value.state], fiveHourSpeed.value.percentPerHour)}`;
 });
 const rightTitle = computed(() => {
   const w = usage.value?.weekly;
-  return w?.reset_at ? `周重置于 ${fmtClock(w.reset_at)}` : "";
+  const reset = w?.reset_at ? `周重置于 ${fmtClock(w.reset_at)}` : "周用量";
+  return `${reset} · ${formatSpeedHint(speedLabels[weeklySpeed.value.state], weeklySpeed.value.percentPerHour)}`;
 });
 
 // 剩余量填充宽度：按当前显示模式取对应百分比
@@ -561,7 +592,7 @@ function onPanelResizeMove(e: MouseEvent) {
   panelH.value = Math.max(PANEL_MIN_HEIGHT, panelResize.h + dy);
   const appliedDx = panelResize.w - panelW.value;
   const win = getCurrentWindow();
-  void win.setSize(new LogicalSize(panelW.value, 30 + panelH.value));
+  void win.setSize(new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value));
   void win.setPosition(new LogicalPosition(panelResize.x + appliedDx, panelResize.y));
 }
 function onPanelResizeEnd() {
@@ -584,17 +615,17 @@ async function togglePanel() {
     const screenW = window.screen.availWidth;
     console.log("DEBUG:", { winX, winY, screenW, panelW: panelW.value });
     panelAlignRight.value = (winX + panelW.value) > screenW;
-    await win.setSize(new LogicalSize(panelW.value, 30 + panelH.value));
+    await win.setSize(new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value));
     if (panelAlignRight.value) {
-      await win.setPosition(new LogicalPosition(winX - (panelW.value - 100), winY));
+      await win.setPosition(new LogicalPosition(winX - (panelW.value - CAPSULE_WIDTH), winY));
     }
   } else {
     // 关闭面板时恢复窗口宽度和位置
     const winX = window.screenX;
     const winY = window.screenY;
-    await win.setSize(new LogicalSize(100, 30));
+    await win.setSize(new LogicalSize(CAPSULE_WIDTH, CAPSULE_HEIGHT));
     if (panelAlignRight.value) {
-      await win.setPosition(new LogicalPosition(winX + (panelW.value - 100), winY));
+      await win.setPosition(new LogicalPosition(winX + (panelW.value - CAPSULE_WIDTH), winY));
     }
     panelAlignRight.value = false;
   }
@@ -641,7 +672,7 @@ function resetDefaults() {
     autostart.value = false;
     onAutostartChange();
   }
-  getCurrentWindow().setSize(new LogicalSize(PANEL_DEFAULT_WIDTH, 30 + PANEL_DEFAULT_HEIGHT));
+  getCurrentWindow().setSize(new LogicalSize(PANEL_DEFAULT_WIDTH, CAPSULE_HEIGHT + PANEL_DEFAULT_HEIGHT));
 }
 
 onMounted(() => {
@@ -692,6 +723,7 @@ onBeforeUnmount(() => {
       <div class="fill fill--red" :style="{ width: rightFillWidth }"></div>
       <span v-show="showUsageValues" class="num" :class="{ dim: showRightReset }">{{ rightDisplay }}</span>
     </div>
+    <div class="speed-outline" :style="speedOutlineStyle" aria-hidden="true"></div>
   </div>
 
   <div v-if="showPanel" class="panel" :class='{ "align-right": panelAlignRight }' :style="{ width: panelW + 'px', height: panelH + 'px' }" @contextmenu.prevent>
@@ -919,7 +951,7 @@ body {
   display: flex;
   align-items: stretch;
   width: 100px;
-  height: 30px;
+  height: 34px;
   flex-shrink: 0;
   gap: 3px;
   padding: 1px;
@@ -935,23 +967,11 @@ body {
   transition: transform 0.14s ease, border-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
-.capsule:hover {
-  box-shadow: none;
-  filter: brightness(1.07) saturate(1.06);
-  animation: capsule-shimmer 1.35s ease-out both;
-}
-
 .capsule:active {
   background: transparent;
   box-shadow: none;
   filter: brightness(0.96);
   transform: scale(0.975);
-  animation: none;
-}
-
-@keyframes capsule-shimmer {
-  from { background-position: 180% 0, 0 0; }
-  to { background-position: -80% 0, 0 0; }
 }
 
 .capsule::before {
@@ -1013,19 +1033,7 @@ body {
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.13);
 }
 
-.half:hover {
-  background: linear-gradient(180deg, rgba(71, 79, 95, 0.98), rgba(35, 40, 51, 0.98));
-  border-color: rgba(255, 255, 255, 0.34);
-  animation: pill-color-shift 0.7s ease-out both;
-}
-
 .half:active { background: linear-gradient(180deg, rgba(39, 45, 57, 0.98), rgba(22, 26, 34, 0.98)); }
-
-@keyframes pill-color-shift {
-  from { background-color: rgba(28, 32, 41, 0.96); }
-  55% { background-color: rgba(82, 98, 128, 0.42); }
-  to { background-color: rgba(55, 61, 74, 0.96); }
-}
 
 /* 单一外壳；主题只改变左右进度填充。 */
 .capsule {
@@ -1036,11 +1044,9 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.24), 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
-.capsule:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 4px 13px rgba(0, 0, 0, 0.36), 0 0 11px rgba(111, 92, 246, 0.2); }
 .capsule:active { background: transparent; box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.34), 0 1px 4px rgba(0, 0, 0, 0.26); }
 .capsule::before, .capsule::after { display: block; }
 .capsule .half { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.capsule .half:hover { background: rgba(255, 255, 255, 0.1); }
 .capsule .half:active { background: rgba(255, 255, 255, 0.16); }
 
 .capsule-realistic .fill {
@@ -1060,44 +1066,53 @@ body {
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  clip-path: polygon(14% 0,86% 0,86% 7%,93% 7%,93% 17%,100% 17%,100% 83%,93% 83%,93% 93%,86% 93%,86% 100%,14% 100%,14% 93%,7% 93%,7% 83%,0 83%,0 17%,7% 17%,7% 7%,14% 7%);
+  padding: 4px 4px 5px;
+  background: #090b0e;
+  clip-path: polygon(8% 0,92% 0,92% 12%,96% 12%,96% 24%,100% 24%,100% 76%,96% 76%,96% 88%,92% 88%,92% 100%,8% 100%,8% 88%,4% 88%,4% 76%,0 76%,0 24%,4% 24%,4% 12%,8% 12%);
   image-rendering: pixelated;
-  filter: none;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .52));
   box-shadow: none;
 }
+
+.capsule-pixel:active { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .5)) brightness(.96); }
 
 .capsule-realistic .num { font-family: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.2px; }
 
 .capsule-pixel::before {
-  inset: 0;
-  height: auto;
+  display: block;
+  inset: 5px auto auto 10px;
+  width: 28px;
+  height: 8px;
   z-index: 8;
-  box-sizing: border-box;
-  padding: 3px 7px;
-  background: #0b0d11;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .92), rgba(207, 237, 255, .48) 46%, transparent 48%);
+  clip-path: polygon(12% 0,100% 0,76% 100%,0 100%,0 45%);
+}
+
+.capsule-pixel::after { display: none; }
+
+.capsule-pixel .half { background: #1e2430; }
+.capsule-pixel .left { flex: 52; clip-path: polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%); }
+.capsule-pixel .right {
+  flex: 48;
+  background: linear-gradient(180deg, #737b89 0, #4b525f 22%, #353c49 58%, #252a34 100%);
+  clip-path: polygon(0 0,94% 0,94% 12%,100% 12%,100% 88%,94% 88%,94% 100%,0 100%);
 }
 
 .capsule-pixel .fill {
   background-color: #287cf5;
   background-image:
-    linear-gradient(180deg, #82c7ff 0, #378df8 43%, #2464e6 100%),
-    linear-gradient(90deg, rgba(255,255,255,.16) 50%, transparent 50%);
-  background-size: auto, 6px 6px;
-  box-shadow: inset 0 2px rgba(189,231,255,.54), inset 0 -3px rgba(18,75,192,.4);
+    linear-gradient(180deg, #83c4ff 0, #4b97f8 22%, #2f7df4 62%, #255ed8 100%);
+  box-shadow: inset 0 2px #b9e4ff, inset 0 -3px rgba(11, 48, 139, .52);
 }
 
 .capsule-pixel .fill--red {
-  background-color: #303746;
-  background-image: linear-gradient(180deg, #5b6375, #303746 48%, #222734);
-  background-size: auto;
-  box-shadow: inset 0 2px rgba(255,255,255,.1), inset 0 -3px rgba(0,0,0,.18);
+  background-color: #11151c;
+  background-image: repeating-conic-gradient(#11151c 0 25%, #222833 0 50%);
+  background-size: 4px 4px;
+  box-shadow: inset 0 1px rgba(255,255,255,.1), inset 0 -2px rgba(0,0,0,.42);
 }
 
-.capsule-pixel .num { font-family: "Cascadia Mono", Consolas, monospace; font-weight: 800; letter-spacing: -1px; text-shadow: 2px 2px 0 #15213a; }
+.capsule-pixel .num { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: calc(var(--num-size, 13px) * 1.08); font-weight: 800; letter-spacing: -.35px; text-shadow: 1px 1px 0 rgba(14, 20, 33, .72); }
 
 .capsule-flat {
   border: 0;
@@ -1150,6 +1165,27 @@ body {
 .capsule-neon .fill--red { background: linear-gradient(90deg, #38196d, #711452); box-shadow: inset 0 0 8px rgba(255,79,203,.33); }
 .capsule-neon .num { color: #fff; font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif; font-weight: 600; letter-spacing: .35px; text-shadow: 0 0 4px #86eaff, 0 0 8px #945cff; }
 
+.speed-outline {
+  position: absolute;
+  z-index: 12;
+  inset: 1px;
+  box-sizing: border-box;
+  padding: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--speed-left) 0 49%, var(--speed-right) 51% 100%);
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.capsule-pixel .speed-outline {
+  inset: 4px;
+  padding: 2px;
+  border-radius: 2px;
+}
+
 .num {
   position: absolute;
   z-index: 5;
@@ -1169,8 +1205,6 @@ body {
   pointer-events: none;
   transition: transform 0.18s ease, opacity 0.15s ease;
 }
-
-.half:hover .num { transform: translateY(-0.5px); }
 
 @media (prefers-reduced-motion: reduce) {
   .capsule,
@@ -1196,7 +1230,7 @@ body {
   --panel-control-bg: rgba(255, 255, 255, 0.06);
   --panel-control-active: rgba(255, 255, 255, 0.1);
   position: fixed;
-  top: 30px;
+  top: 34px;
   left: 0;
   z-index: 10;
   display: flex;

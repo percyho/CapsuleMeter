@@ -67,11 +67,14 @@ const emit = defineEmits<{
 .preview-right .preview-fill { inset: 0; width: 100%; background: linear-gradient(90deg,#ff956f,#e11d48); }
 .preview-num { position: relative; z-index: 1; color: #f8fafc; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #0008; }
 .preview-realistic .preview-num { font-family:"Segoe UI Variable Display","Segoe UI",sans-serif; font-weight:700; letter-spacing:-.2px; }
-.preview-pixel { overflow: hidden; border: 0; border-radius: 0; clip-path: polygon(14% 0,86% 0,86% 7%,93% 7%,93% 17%,100% 17%,100% 83%,93% 83%,93% 93%,86% 93%,86% 100%,14% 100%,14% 93%,7% 93%,7% 83%,0 83%,0 17%,7% 17%,7% 7%,14% 7%); image-rendering: pixelated; filter:none; box-shadow:none; }
-.preview-pixel::before { content:""; position:absolute; inset:0; z-index:4; box-sizing:border-box; padding:3px 7px; pointer-events:none; background:#0b0d11; -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; }
-.preview-pixel .preview-fill { background-color:#287cf5; background-image:linear-gradient(180deg,#82c7ff 0,#378df8 43%,#2464e6 100%),linear-gradient(90deg,#ffffff28 50%,transparent 50%); background-size:auto,6px 6px; box-shadow:inset 0 2px #bde7ff88,inset 0 -3px #124bc066; }
-.preview-pixel .preview-right .preview-fill { background-color:#303746; background-image:linear-gradient(180deg,#5b6375,#303746 48%,#222734); }
-.preview-pixel .preview-num { font-family:"Cascadia Mono",Consolas,monospace; font-weight:800; letter-spacing:-1px; text-shadow:2px 2px 0 #15213a; }
+.preview-pixel { height:34px; overflow:hidden; border:0; border-radius:0; padding:4px 4px 5px; background:#090b0e; clip-path:polygon(8% 0,92% 0,92% 12%,96% 12%,96% 24%,100% 24%,100% 76%,96% 76%,96% 88%,92% 88%,92% 100%,8% 100%,8% 88%,4% 88%,4% 76%,0 76%,0 24%,4% 24%,4% 12%,8% 12%); image-rendering:pixelated; filter:drop-shadow(0 3px 0 rgba(0,0,0,.52)); box-shadow:none; }
+.preview-pixel::before { content:""; position:absolute; inset:5px auto auto 10px; z-index:4; width:28px; height:8px; pointer-events:none; background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(207,237,255,.48) 46%,transparent 48%); clip-path:polygon(12% 0,100% 0,76% 100%,0 100%,0 45%); }
+.preview-pixel .preview-half { background:#1e2430; }
+.preview-pixel .preview-left { flex:52; clip-path:polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%); }
+.preview-pixel .preview-right { flex:48; background:linear-gradient(180deg,#737b89 0,#4b525f 22%,#353c49 58%,#252a34 100%); clip-path:polygon(0 0,94% 0,94% 12%,100% 12%,100% 88%,94% 88%,94% 100%,0 100%); }
+.preview-pixel .preview-fill { background-color:#287cf5; background-image:linear-gradient(180deg,#83c4ff 0,#4b97f8 22%,#2f7df4 62%,#255ed8 100%); box-shadow:inset 0 2px #b9e4ff,inset 0 -3px rgba(11,48,139,.52); }
+.preview-pixel .preview-right .preview-fill { inset:0 auto 0 0; width:41%; background-color:#11151c; background-image:repeating-conic-gradient(#11151c 0 25%,#222833 0 50%); background-size:4px 4px; box-shadow:inset 0 1px rgba(255,255,255,.1),inset 0 -2px rgba(0,0,0,.42); }
+.preview-pixel .preview-num { font-family:Arial,"Microsoft YaHei",sans-serif; font-size:14px; font-weight:800; letter-spacing:-.35px; text-shadow:1px 1px 0 rgba(14,20,33,.72); }
 .preview-flat { border:0; background:transparent; box-shadow:none; }
 .preview-flat .preview-fill { background:#3787f7; }
 .preview-flat .preview-right .preview-fill { background:#111318; }
