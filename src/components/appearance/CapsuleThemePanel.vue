@@ -66,7 +66,6 @@ const emit = defineEmits<{
 .preview-fill { position: absolute; inset: 0; width: 100%; background: linear-gradient(90deg,#4f46e5,#9b87f5); }
 .preview-right .preview-fill { inset: 0; width: 100%; background: linear-gradient(90deg,#ff956f,#e11d48); }
 .preview-num { position: relative; z-index: 1; color: #f8fafc; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #0008; }
-.preview-realistic .preview-num { font-family:"Space Grotesk","Microsoft YaHei",sans-serif; font-weight:700; letter-spacing:-.2px; }
 .preview-pixel { height:34px; overflow:hidden; border:0; border-radius:0; padding:4px 4px 5px; background:#090b0e; clip-path:polygon(8% 0,92% 0,92% 12%,96% 12%,96% 24%,100% 24%,100% 76%,96% 76%,96% 88%,92% 88%,92% 100%,8% 100%,8% 88%,4% 88%,4% 76%,0 76%,0 24%,4% 24%,4% 12%,8% 12%); image-rendering:pixelated; filter:drop-shadow(0 3px 0 rgba(0,0,0,.52)); box-shadow:none; }
 .preview-pixel::before { display:none; }
 .preview-pixel .preview-half { background:#1e2430; }
@@ -79,15 +78,11 @@ const emit = defineEmits<{
 .preview-flat .preview-fill { background:#3787f7; }
 .preview-flat .preview-right .preview-fill { background:#111318; }
 .preview-flat .preview-num { font-family:Manrope,"Microsoft YaHei",sans-serif; font-weight:700; letter-spacing:0; text-shadow:none; }
-.preview-skeuomorphic { border-color:#95a4bc; background:transparent; box-shadow:inset 0 2px 3px #fff8,inset 0 -3px 5px #0008,0 5px 9px #0006; }
+.preview-skeuomorphic { border-color:#95a4bc; background:transparent; box-shadow:inset 0 2px 3px #fff8,inset 0 -3px 5px #0008; }
 .preview-skeuomorphic .preview-fill { background:linear-gradient(180deg,#b9efff,#2964f1 62%,#3420c8); }
 .preview-skeuomorphic .preview-right .preview-fill { background:linear-gradient(180deg,#565e72,#171b28); }
 .preview-skeuomorphic .preview-num { font-family:Sora,"Microsoft YaHei",sans-serif; font-weight:700; letter-spacing:-.3px; text-shadow:0 2px 2px #0009; }
-.preview-jelly { border-color:#91eaff; background:transparent; box-shadow:inset 0 3px 3px #fff9,inset 0 -3px 5px #1634a099,0 0 8px #4acfff77; }
-.preview-jelly .preview-fill { background:linear-gradient(90deg,#3687ff,#736dff); }
-.preview-jelly .preview-right .preview-fill { background:linear-gradient(90deg,#8b62ff,#f244a9); }
-.preview-jelly .preview-num { font-family:Fredoka,"Microsoft YaHei",sans-serif; font-weight:700; letter-spacing:-.35px; text-shadow:0 1px 2px #3a2180aa; }
-.preview-neon { border:2px solid transparent; background:linear-gradient(transparent,transparent) padding-box,linear-gradient(100deg,#42dfff 0%,#985cff 50%,#ff62c7 100%) border-box; box-shadow:-2px 0 7px #42dfff99,2px 0 7px #ff62c788,0 0 12px #7a35ff, inset 0 0 8px #131c55; }
+.preview-neon { border:2px solid transparent; background:linear-gradient(transparent,transparent) padding-box,linear-gradient(100deg,#42dfff 0%,#985cff 50%,#ff62c7 100%) border-box; box-shadow:inset 0 0 8px #131c55; }
 .preview-neon::after { content:""; position:absolute; inset:0 49% 0 auto; z-index:3; width:1px; background:#f06bff; box-shadow:0 0 5px #e053ff; }
 .preview-neon .preview-fill { background:linear-gradient(90deg,#073d72,#302070); box-shadow:inset 0 0 8px #35dcff55; }
 .preview-neon .preview-right .preview-fill { background:linear-gradient(90deg,#38196d,#711452); box-shadow:inset 0 0 8px #ff4fcb55; }

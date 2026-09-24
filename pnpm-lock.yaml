@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@fontsource/fredoka':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@fontsource/manrope':
         specifier: ^5.3.0
         version: 5.3.0
@@ -21,9 +18,6 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource/sora':
-        specifier: ^5.3.0
-        version: 5.3.0
-      '@fontsource/space-grotesk':
         specifier: ^5.3.0
         version: 5.3.0
       '@tauri-apps/api':
@@ -245,9 +239,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fontsource/fredoka@5.3.0':
-    resolution: {integrity: sha512-s2IhjQ50wDnKkkaKmjhtL0rxQg6ITsVusiipM3m7zUwVZZbbCKsscNDkngwp28xVzfIt7neWrkgU1qKqyTycQg==}
-
   '@fontsource/manrope@5.3.0':
     resolution: {integrity: sha512-obJ1Dv3+uCA6HlHgW8u4BGYxJR9In2HW7gjJhlflEvkrj1X1iSEwu0fToL+JYGC/FEKFfIz1sBuPduvcL2gIAA==}
 
@@ -259,9 +250,6 @@ packages:
 
   '@fontsource/sora@5.3.0':
     resolution: {integrity: sha512-SqW3OpKxxfKvxDLPlbdrWf2KooPfbd+W3jaYn483o+Y/JrmU87vjFPNptDqwP428c3vY+gnranLhjcbRaXB0Jw==}
-
-  '@fontsource/space-grotesk@5.3.0':
-    resolution: {integrity: sha512-ksnGizDPXIDuvqcTYTSrmZ+evx9sDlS8rp7+42BQ7wU+spt3twEoXfbJz672C+5CLg6VeUQwRy5RXshWb67LcQ==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -928,8 +916,6 @@ snapshots:
   '@esbuild/win32-x64@0.25.12':
     optional: true
 
-  '@fontsource/fredoka@5.3.0': {}
-
   '@fontsource/manrope@5.3.0': {}
 
   '@fontsource/oxanium@5.3.0': {}
@@ -937,8 +923,6 @@ snapshots:
   '@fontsource/pixelify-sans@5.3.0': {}
 
   '@fontsource/sora@5.3.0': {}
-
-  '@fontsource/space-grotesk@5.3.0': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
 

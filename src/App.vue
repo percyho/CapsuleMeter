@@ -753,7 +753,7 @@ function onContextMenu(e: MouseEvent) {
 function resetDefaults() {
   opacity.value = 0.72;
   fontSize.value = 13;
-  capsuleStyle.value = "realistic";
+  capsuleStyle.value = "flat";
   uiTheme.value = "dark";
   setLocale("zh-CN");
   alwaysOnTop.value = true;
@@ -1595,31 +1595,6 @@ body {
   box-shadow: none;
 }
 
-.capsule-realistic .fill {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.36),
-      transparent 36%,
-      rgba(35, 24, 104, 0.24) 100%
-    ),
-    linear-gradient(90deg, #4f46e5, #9b87f5);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.4),
-    inset 0 -2px 3px rgba(35, 24, 104, 0.28);
-}
-
-.capsule-realistic .fill--red {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.36),
-      transparent 36%,
-      rgba(102, 11, 39, 0.22) 100%
-    ),
-    linear-gradient(90deg, #ff956f, #e11d48);
-}
-
 .capsule-pixel {
   overflow: hidden;
   border: 0;
@@ -1651,12 +1626,6 @@ body {
   image-rendering: pixelated;
   filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.52));
   box-shadow: none;
-}
-
-.capsule-realistic .num {
-  font-family: "Space Grotesk", "Microsoft YaHei", sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.2px;
 }
 
 .capsule-pixel::before {
@@ -1770,8 +1739,7 @@ body {
   background: transparent;
   box-shadow:
     inset 0 2px 3px rgba(255, 255, 255, 0.48),
-    inset 0 -3px 5px rgba(0, 0, 0, 0.52),
-    0 5px 9px rgba(0, 0, 0, 0.42);
+    inset 0 -3px 5px rgba(0, 0, 0, 0.52);
 }
 
 .capsule-skeuomorphic .fill {
@@ -1788,39 +1756,12 @@ body {
   text-shadow: 0 2px 2px rgba(0, 0, 0, 0.6);
 }
 
-.capsule-jelly {
-  border-color: rgba(145, 234, 255, 0.82);
-  background: transparent;
-  box-shadow:
-    inset 0 3px 3px rgba(255, 255, 255, 0.56),
-    inset 0 -3px 5px rgba(22, 52, 160, 0.6),
-    0 0 8px rgba(74, 207, 255, 0.46);
-}
-
-.capsule-jelly .fill {
-  background: linear-gradient(90deg, #3687ff, #736dff);
-  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.42);
-}
-.capsule-jelly .fill--red {
-  background: linear-gradient(90deg, #8b62ff, #f244a9);
-}
-.capsule-jelly .num {
-  font-family: Fredoka, "Microsoft YaHei", sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.35px;
-  text-shadow: 0 1px 2px rgba(58, 33, 128, 0.66);
-}
-
 .capsule-neon {
   border: 2px solid transparent;
   background:
     linear-gradient(transparent, transparent) padding-box,
     linear-gradient(100deg, #42dfff 0%, #985cff 50%, #ff62c7 100%) border-box;
-  box-shadow:
-    -2px 0 7px rgba(66, 223, 255, 0.6),
-    2px 0 7px rgba(255, 98, 199, 0.53),
-    0 0 12px rgba(122, 53, 255, 0.82),
-    inset 0 0 8px rgba(19, 28, 85, 0.7);
+  box-shadow: inset 0 0 8px rgba(19, 28, 85, 0.7);
 }
 
 .capsule-neon::after {
