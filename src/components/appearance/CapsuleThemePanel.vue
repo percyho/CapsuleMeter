@@ -68,9 +68,9 @@ const emit = defineEmits<{
 .preview-num { position: relative; z-index: 1; color: #f8fafc; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #0008; }
 .preview-realistic .preview-num { font-family:"Segoe UI Variable Display","Segoe UI",sans-serif; font-weight:700; letter-spacing:-.2px; }
 .preview-pixel { height:34px; overflow:hidden; border:0; border-radius:0; padding:4px 4px 5px; background:#090b0e; clip-path:polygon(8% 0,92% 0,92% 12%,96% 12%,96% 24%,100% 24%,100% 76%,96% 76%,96% 88%,92% 88%,92% 100%,8% 100%,8% 88%,4% 88%,4% 76%,0 76%,0 24%,4% 24%,4% 12%,8% 12%); image-rendering:pixelated; filter:drop-shadow(0 3px 0 rgba(0,0,0,.52)); box-shadow:none; }
-.preview-pixel::before { content:""; position:absolute; inset:5px auto auto 10px; z-index:4; width:28px; height:8px; pointer-events:none; background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(207,237,255,.48) 46%,transparent 48%); clip-path:polygon(12% 0,100% 0,76% 100%,0 100%,0 45%); }
+.preview-pixel::before { display:none; }
 .preview-pixel .preview-half { background:#1e2430; }
-.preview-pixel .preview-left { flex:52; clip-path:polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%); }
+.preview-pixel .preview-left { flex:52; background:linear-gradient(180deg,#737b89 0,#4b525f 22%,#353c49 58%,#252a34 100%); clip-path:polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%); }
 .preview-pixel .preview-right { flex:48; background:linear-gradient(180deg,#737b89 0,#4b525f 22%,#353c49 58%,#252a34 100%); clip-path:polygon(0 0,94% 0,94% 12%,100% 12%,100% 88%,94% 88%,94% 100%,0 100%); }
 .preview-pixel .preview-fill { background-color:#287cf5; background-image:linear-gradient(180deg,#83c4ff 0,#4b97f8 22%,#2f7df4 62%,#255ed8 100%); box-shadow:inset 0 2px #b9e4ff,inset 0 -3px rgba(11,48,139,.52); }
 .preview-pixel .preview-right .preview-fill { inset:0 auto 0 0; width:41%; background-color:#11151c; background-image:repeating-conic-gradient(#11151c 0 25%,#222833 0 50%); background-size:4px 4px; box-shadow:inset 0 1px rgba(255,255,255,.1),inset 0 -2px rgba(0,0,0,.42); }

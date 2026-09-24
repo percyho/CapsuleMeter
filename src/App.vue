@@ -776,6 +776,12 @@ onBeforeUnmount(() => {
         <input type="range" min="9" max="20" step="1" v-model.number="fontSize" @input="onFontSizeChange" />
         <span class="row-val">{{ fontSize }}px</span>
       </div>
+      <div class="row">
+        <span class="row-name">{{ t("显示用量数值") }}</span>
+        <button class="switch" :class="{ on: showUsageValues }" @click="onShowUsageValuesChange()">
+          <span class="knob"></span>
+        </button>
+      </div>
 
       </template>
 
@@ -868,13 +874,6 @@ onBeforeUnmount(() => {
           <button :class="{ on: trayIconMode === 'usage' }" @click="onTrayIconModeChange('usage')">{{ t("用量环") }}</button>
         </div>
       </div>
-      <div class="row">
-        <span class="row-name">{{ t("显示用量数值") }}</span>
-        <button class="switch" :class="{ on: showUsageValues }" @click="onShowUsageValuesChange()">
-          <span class="knob"></span>
-        </button>
-      </div>
-
       <div class="row row-flat">
         <span class="row-name">{{ t("低额度通知") }}</span>
         <button class="switch" :class="{ on: notificationsEnabled }" @click="notificationsEnabled = !notificationsEnabled; onNotificationChange()"><span class="knob"></span></button>
@@ -1078,20 +1077,16 @@ body {
 
 .capsule-realistic .num { font-family: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.2px; }
 
-.capsule-pixel::before {
-  display: block;
-  inset: 5px auto auto 10px;
-  width: 28px;
-  height: 8px;
-  z-index: 8;
-  background: linear-gradient(135deg, rgba(255, 255, 255, .92), rgba(207, 237, 255, .48) 46%, transparent 48%);
-  clip-path: polygon(12% 0,100% 0,76% 100%,0 100%,0 45%);
-}
+.capsule-pixel::before { display: none; }
 
 .capsule-pixel::after { display: none; }
 
 .capsule-pixel .half { background: #1e2430; }
-.capsule-pixel .left { flex: 52; clip-path: polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%); }
+.capsule-pixel .left {
+  flex: 52;
+  background: linear-gradient(180deg, #737b89 0, #4b525f 22%, #353c49 58%, #252a34 100%);
+  clip-path: polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%);
+}
 .capsule-pixel .right {
   flex: 48;
   background: linear-gradient(180deg, #737b89 0, #4b525f 22%, #353c49 58%, #252a34 100%);
