@@ -73,7 +73,7 @@ const emit = defineEmits<{
 .preview-pixel .preview-left { flex:52; background:linear-gradient(180deg,#737b89 0,#4b525f 22%,#353c49 58%,#252a34 100%); clip-path:polygon(6% 0,100% 0,100% 100%,6% 100%,6% 88%,0 88%,0 12%,6% 12%); }
 .preview-pixel .preview-right { flex:48; background:linear-gradient(180deg,#737b89 0,#4b525f 22%,#353c49 58%,#252a34 100%); clip-path:polygon(0 0,94% 0,94% 12%,100% 12%,100% 88%,94% 88%,94% 100%,0 100%); }
 .preview-pixel .preview-fill { background-color:#287cf5; background-image:linear-gradient(180deg,#83c4ff 0,#4b97f8 22%,#2f7df4 62%,#255ed8 100%); box-shadow:inset 0 2px #b9e4ff,inset 0 -3px rgba(11,48,139,.52); }
-.preview-pixel .preview-right .preview-fill { inset:0 auto 0 0; width:41%; background-color:#11151c; background-image:repeating-conic-gradient(#11151c 0 25%,#222833 0 50%); background-size:4px 4px; box-shadow:inset 0 1px rgba(255,255,255,.1),inset 0 -2px rgba(0,0,0,.42); }
+.preview-pixel .preview-right .preview-fill { background-color:#20252e; background-image:linear-gradient(180deg,#596170 0,#3d4552 24%,#292f3a 58%,#171b22 100%); box-shadow:inset 0 2px rgba(255,255,255,.22),inset 0 -3px rgba(0,0,0,.48); }
 .preview-pixel .preview-num { font-family:Arial,"Microsoft YaHei",sans-serif; font-size:14px; font-weight:800; letter-spacing:-.35px; text-shadow:1px 1px 0 rgba(14,20,33,.72); }
 .preview-flat { border:0; background:transparent; box-shadow:none; }
 .preview-flat .preview-fill { background:#3787f7; }

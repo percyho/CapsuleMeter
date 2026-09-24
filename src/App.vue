@@ -1101,10 +1101,9 @@ body {
 }
 
 .capsule-pixel .fill--red {
-  background-color: #11151c;
-  background-image: repeating-conic-gradient(#11151c 0 25%, #222833 0 50%);
-  background-size: 4px 4px;
-  box-shadow: inset 0 1px rgba(255,255,255,.1), inset 0 -2px rgba(0,0,0,.42);
+  background-color: #20252e;
+  background-image: linear-gradient(180deg, #596170 0, #3d4552 24%, #292f3a 58%, #171b22 100%);
+  box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.48);
 }
 
 .capsule-pixel .num { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: calc(var(--num-size, 13px) * 1.08); font-weight: 800; letter-spacing: -.35px; text-shadow: 1px 1px 0 rgba(14, 20, 33, .72); }
