@@ -864,7 +864,7 @@ onBeforeUnmount(() => {
       <div class="half left" @click="onLeftClick" :title="leftTitle">
         <div class="fill" :style="{ width: leftFillWidth }"></div>
         <span
-          v-show="showUsageValues"
+          v-show="showUsageValues || showLeftReset"
           class="num"
           :class="{ dim: showLeftReset }"
           >{{ leftDisplay }}</span
@@ -873,7 +873,7 @@ onBeforeUnmount(() => {
       <div class="half right" @click="onRightClick" :title="rightTitle">
         <div class="fill fill--red" :style="{ width: rightFillWidth }"></div>
         <span
-          v-show="showUsageValues"
+          v-show="showUsageValues || showRightReset"
           class="num"
           :class="{ dim: showRightReset }"
           >{{ rightDisplay }}</span
