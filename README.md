@@ -35,7 +35,7 @@ A compact 100×30 desktop widget that displays the remaining usage for the local
 - **Usage history**: Includes quota and token trends, retention settings, manual refresh, clearing, and CSV export.
 - **Usage reset credits**: Shows available reset credits and expiration details, with a two-step confirmation before resetting both weekly and 5-hour limits.
 - **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. The tray icon can use the app logo or dynamic dual usage rings.
-- **Consumption speed**: Two colored indicators outside the capsule show the recent consumption speed for the 5-hour and weekly windows; hover over the corresponding capsule side to see the estimate.
+- **Consumption speed**: The dots outside the capsule show recent consumption speed: gray = assessing (not enough data), green = slow, blue = normal, orange = fast, and red = critical. The left dot is for the 5-hour window and the right dot is for the weekly window. Hover over the corresponding capsule side to see the estimate.
 - **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default. A new key combination can be recorded directly in System settings.
 - **Account information**: Shows the current Codex account below the plan name. The value is read only from local Codex authentication data.
 - **Maintenance tools**: Re-authenticate, run Codex diagnostics, and check Gitee Releases for updates.
