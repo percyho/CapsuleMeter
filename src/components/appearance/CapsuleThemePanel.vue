@@ -74,7 +74,7 @@ const emit = defineEmits<{
 .preview-pixel .preview-right { flex:48; background:linear-gradient(180deg,#737b89 0,#4b525f 22%,#353c49 58%,#252a34 100%); clip-path:polygon(0 0,94% 0,94% 12%,100% 12%,100% 88%,94% 88%,94% 100%,0 100%); }
 .preview-pixel .preview-fill { background-color:#287cf5; background-image:linear-gradient(180deg,#83c4ff 0,#4b97f8 22%,#2f7df4 62%,#255ed8 100%); box-shadow:inset 0 2px #b9e4ff,inset 0 -3px rgba(11,48,139,.52); }
 .preview-pixel .preview-right .preview-fill { background-color:#20252e; background-image:linear-gradient(180deg,#596170 0,#3d4552 24%,#292f3a 58%,#171b22 100%); box-shadow:inset 0 2px rgba(255,255,255,.22),inset 0 -3px rgba(0,0,0,.48); }
-.preview-pixel .preview-num { font-family:Arial,"Microsoft YaHei",sans-serif; font-size:14px; font-weight:800; letter-spacing:-.35px; text-shadow:1px 1px 0 rgba(14,20,33,.72); }
+.preview-pixel .preview-num { font-family:"Pixelify Sans",Arial,"Microsoft YaHei",sans-serif; font-size:14px; font-weight:800; letter-spacing:-.35px; text-shadow:1px 1px 0 rgba(14,20,33,.72); }
 .preview-flat { border:0; background:transparent; box-shadow:none; }
 .preview-flat .preview-fill { background:#3787f7; }
 .preview-flat .preview-right .preview-fill { background:#111318; }

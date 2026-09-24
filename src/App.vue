@@ -1734,7 +1734,7 @@ body {
 }
 
 .capsule-pixel .num {
-  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-family: "Pixelify Sans", Arial, "Microsoft YaHei", sans-serif;
   font-size: calc(var(--num-size, 13px) * 1.08);
   font-weight: 800;
   letter-spacing: -0.35px;
