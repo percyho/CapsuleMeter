@@ -9,11 +9,11 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-A compact 100×30 desktop widget that displays the remaining usage for the locally authenticated **Codex CLI** ChatGPT account.
+A compact 140×34 desktop widget that displays the remaining usage for the locally authenticated **Codex CLI** ChatGPT account.
 
 ## Features
 
-- **Capsule window**: A frameless 100×30 capsule showing the 5-hour and weekly usage windows side by side.
+- **Capsule window**: A frameless 140×34 capsule showing the 5-hour and weekly usage windows side by side.
 - **Window dragging**: Drag the capsule to reposition it. It automatically snaps to screen edges and corners while avoiding the taskbar, and restores its position after restart.
 - **Left side**: Shows the remaining percentage for the 5-hour window with an indigo gradient fill.
 - **Right side**: Shows the remaining percentage for the weekly window with a coral-to-rose gradient fill.
@@ -29,14 +29,16 @@ A compact 100×30 desktop widget that displays the remaining usage for the local
   - **Opacity**: Adjust the window opacity in real time.
   - **Text size**: Adjust the usage value font size.
   - **Show usage values**: Hide the percentage values while keeping progress fills visible. Clicking either side still temporarily shows its reset time.
+  - **Behavior controls**: Toggle always-on-top and edge snapping, switch between remaining and used percentages, and choose how long reset times stay visible (3, 5, 8, or 10 seconds).
+  - **Refresh and retention**: Choose an automatic refresh interval of 1, 2, 5, 10, or 30 minutes, refresh immediately, and retain local history for 7, 30, 90, or 365 days.
   - **Show capsule**: Hide the capsule and restore it later from the tray or with the global shortcut.
   - All settings are saved automatically and restored after restart.
-- **Automatic refresh**: Fetches updated usage from the OpenAI backend every five minutes by default.
+- **Automatic refresh**: Fetches updated usage from the OpenAI backend every five minutes by default; the interval is configurable from 1 to 30 minutes.
 - **Usage history**: Includes quota and token trends, retention settings, manual refresh, clearing, and CSV export.
 - **Usage reset credits**: Shows available reset credits and expiration details, with a two-step confirmation before resetting both weekly and 5-hour limits.
-- **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. The tray icon can use the app logo or dynamic dual usage rings.
+- **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. Notifications can be enabled or disabled with 10%, 20%, or 30% thresholds. The tray icon can use the app logo or dynamic dual usage rings.
 - **Consumption speed**: The dots outside the capsule show recent consumption speed: gray = assessing (not enough data), green = slow, blue = normal, orange = fast, and red = critical. The left dot is for the 5-hour window and the right dot is for the weekly window. Hover over the corresponding capsule side to see the estimate.
-- **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default. A new key combination can be recorded directly in System settings.
+- **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default. A new key combination can be recorded directly in System settings, and the shortcut can be disabled.
 - **Account information**: Shows the current Codex account below the plan name. The value is read only from local Codex authentication data.
 - **Maintenance tools**: Re-authenticate, run Codex diagnostics, and check Gitee Releases for updates.
 
@@ -78,7 +80,7 @@ node scripts/bump-version.js patch   # Or minor / major
 
 ## Release and Build Outputs
 
-The current release is **v1.0.1**. The Windows x64 NSIS installer is produced at:
+The current release is **v1.0.2**. The Windows x64 NSIS installer is produced at:
 
 ```text
 Executable:  src-tauri/target/release/codex-capsule.exe
@@ -93,7 +95,7 @@ The executable and installer are local build artifacts and are not committed to 
 codexcApsule/
 ├── src/                    # Vue 3 frontend
 │   ├── App.vue             # Capsule window and settings panel
-│   ├── components/         # Statistics, reset credits, and shared UI components
+│   ├── components/         # Statistics, reset credits, appearance, and shared UI components
 │   ├── composables/        # Theme, locale, history, and global-shortcut logic
 │   ├── types/              # Frontend data types
 │   └── views/              # Usage history window
@@ -104,7 +106,7 @@ codexcApsule/
 │   │   ├── usage.rs        # Reads authentication and requests usage data
 │   │   ├── window_pos.rs   # Window-position persistence
 │   │   └── lib.rs          # Application entry point
-│   └── tauri.conf.json     # Window configuration
+│   └── tauri.conf.json     # Window configuration (140×34 capsule, frameless, always on top)
 ```
 
 ## Known Limitations
