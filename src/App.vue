@@ -2773,6 +2773,23 @@ html[data-ui-theme="light"] .shortcut-input:focus {
 html[data-ui-theme="light"] .panel-foot {
   background: rgba(20, 28, 42, 0.025);
 }
+html[data-ui-theme="light"] .panel .btn-mini:not(.btn-secondary):not(.btn-danger) {
+  color: #475467;
+  border-color: rgba(20, 28, 42, 0.14);
+  background: #eceef1;
+}
+html[data-ui-theme="light"] .panel .btn-mini:not(.btn-secondary):not(.btn-danger):hover {
+  color: #1d2939;
+  border-color: rgba(20, 28, 42, 0.22);
+  background: #e2e5e9;
+}
+html[data-ui-theme="light"] .panel .btn-mini:not(.btn-secondary):not(.btn-danger):active {
+  background: #d9dde3;
+}
+html[data-ui-theme="light"] .panel .btn-mini:not(.btn-secondary):not(.btn-danger):disabled {
+  color: #98a2b3;
+  cursor: not-allowed;
+}
 html[data-ui-theme="light"] .kpi-val {
   color: #1d2433;
 }
