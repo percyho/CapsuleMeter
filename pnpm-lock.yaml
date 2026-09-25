@@ -14,10 +14,10 @@ importers:
       '@fontsource/oxanium':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource/pixelify-sans':
+      '@fontsource/sora':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource/sora':
+      '@fontsource/tiny5':
         specifier: ^5.3.0
         version: 5.3.0
       '@tauri-apps/api':
@@ -245,11 +245,11 @@ packages:
   '@fontsource/oxanium@5.3.0':
     resolution: {integrity: sha512-MpTsBMyPvlorqKkMVoaN8zctjty1vwO7WSOkNYhUj+oE6EEzL9I/j2EoEHLEEWIgTIRYwdxGMNLegBcvnc4nbQ==}
 
-  '@fontsource/pixelify-sans@5.3.0':
-    resolution: {integrity: sha512-4RCe9nXbi7wUu5+H0FNX1sgPZ2kJ1MmY1uTkEfvQIzzqhoS8zGKJaJfdK8oreE0OU+5gM+NdurFi3H3FJRBvyw==}
-
   '@fontsource/sora@5.3.0':
     resolution: {integrity: sha512-SqW3OpKxxfKvxDLPlbdrWf2KooPfbd+W3jaYn483o+Y/JrmU87vjFPNptDqwP428c3vY+gnranLhjcbRaXB0Jw==}
+
+  '@fontsource/tiny5@5.3.0':
+    resolution: {integrity: sha512-29H01ByMRs6uiLeOoBnZLedf0dR3pF5A53cIBzhp1/Y6Bu5D0t5selTb4TWs3ENoc/OK71rOed5xAdvBywe4aQ==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -920,9 +920,9 @@ snapshots:
 
   '@fontsource/oxanium@5.3.0': {}
 
-  '@fontsource/pixelify-sans@5.3.0': {}
-
   '@fontsource/sora@5.3.0': {}
+
+  '@fontsource/tiny5@5.3.0': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
 

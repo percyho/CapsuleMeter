@@ -1897,10 +1897,10 @@ body {
 }
 
 .capsule-pixel .num {
-  font-family: "Pixelify Sans", Arial, "Microsoft YaHei", sans-serif;
+  font-family: Tiny5, Arial, "Microsoft YaHei", sans-serif;
   font-size: calc(var(--num-size, 13px) * 1.08);
-  font-weight: 800;
-  letter-spacing: -0.35px;
+  font-weight: 400;
+  letter-spacing: 0;
   text-shadow: 1px 1px 0 rgba(14, 20, 33, 0.72);
 }
 
