@@ -54,6 +54,7 @@
   .download-arrow{transform:translateY(0);transition:transform .28s cubic-bezier(.2,.7,.2,1)}
   .install-download svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .install-download:hover .download-arrow,.install-download:focus-visible .download-arrow{transform:translateY(2px)}
+  .feature-preview svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .github-source svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .github-body{transform-box:view-box;transform-origin:center;}
   .github-tail{transform-box:view-box;transform-origin:9px 18px;}
@@ -87,6 +88,8 @@
   .demo-stage{position:relative;background:#171a1f;border:1px solid #30343a;border-radius:18px;padding:40px 32px;box-shadow:0 24px 50px -32px rgba(0,0,0,.7)}
   .demo-stage .stage-label{position:absolute;top:20px;left:26px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
   .demo-stage .stage-label i{width:6px;height:6px;border-radius:50%;background:var(--teal)}
+  .demo-stage .stage-label-copy{display:flex;align-items:center;gap:4px}
+  .demo-stage #demoThemeLabel{color:var(--ink);font-weight:700}
   .dot{display:inline-block;width:9px;height:9px;flex:none;border-radius:50%;background:#94a3b8}
   .dot.l{background:#55d6a8}
   .dot.r{background:#f5a524}
@@ -174,12 +177,18 @@
   .history-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
   .history-tabs,.history-control-group{display:flex;align-items:center;gap:4px}
   .history-tabs{padding:3px;border-radius:10px;background:#dce5ef}
-  .history-tab,.history-control{min-height:33px;border:1px solid transparent;border-radius:8px;padding:0 11px;background:transparent;color:#60718a;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .history-tab,.history-control{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:33px;border:1px solid transparent;border-radius:8px;padding:0 11px;background:transparent;color:#60718a;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
   .history-tab.is-active,.history-control.is-active{background:#fff;color:#18263b;box-shadow:0 1px 4px #172b451f;border-color:#e1e6ed}
   .history-tab:focus-visible{outline:2px solid #3787f7;outline-offset:2px}
-  .history-tools{display:flex;align-items:center;justify-content:center;gap:10px;flex:1 1 560px;flex-wrap:wrap}
+  .history-tools{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;flex:1 1 560px}
+  .history-tools>.history-filter-group{justify-self:start}
+  .history-tools>.history-segment{grid-column:2;justify-self:center}
+  .history-tools>.history-actions{grid-column:3;justify-self:end}
+  .history-tools[data-history-toolbar="tokens"]>.history-segment{grid-column:2}
   .history-filter-group,.history-segment,.history-actions{display:flex;align-items:center}
   .history-filter-group{gap:7px}
+  .history-filter-group .history-control{gap:7px}
+  .history-filter-group .history-control::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-1px) rotate(45deg);flex:none}
   .history-tool-label{font-size:11px;font-weight:600;color:#71819a;white-space:nowrap}
   .history-segment{gap:2px;padding:3px;border:1px solid #dce3ec;border-radius:10px;background:#e4eaf1}
   .history-segment .history-control{min-height:29px;padding:0 10px;border-color:transparent;background:transparent}
@@ -203,11 +212,15 @@
   .history-chart .grid{stroke:#dce2e9;stroke-width:1}
   .history-chart .area{fill:#1685f8;fill-opacity:.11}
   .history-chart .line{fill:none;stroke:#1685f8;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-  .history-token-chart{position:relative;display:grid;place-items:center;min-height:300px;color:#718099;font-size:13px}
-  .history-token-chart:after{content:"";position:absolute;right:3%;bottom:14px;left:3%;height:1px;background:#dce2e9}
+  .history-token-chart{min-height:300px;color:#718099;font-size:13px}
+  .history-token-svg{display:block;width:100%;height:auto;overflow:visible}
+  .history-token-svg .grid{stroke:#dce2e9;stroke-width:1}
+  .history-token-svg .axis-label{fill:#718099;font-size:12px}
+  .history-token-svg .token-bar rect{fill:#1685f8;fill-opacity:.78;transition:fill-opacity .16s ease}
+  .history-token-svg .token-bar:hover rect{fill-opacity:1}
   .history-footer{display:flex;justify-content:space-between;gap:12px;padding:13px 2px 11px;color:#8b9bb1;font-size:11px}
   .showcase-pane[hidden],[data-history-toolbar][hidden]{display:none}
-  @media(max-width:760px){.showcase{padding:18px}.history-app{padding:12px 12px 0}.history-titlebar{padding:0 14px}.history-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.history-chart-card{min-height:0}.history-window-controls{gap:12px}}
+  @media(max-width:760px){.showcase{padding:18px}.history-app{padding:12px 12px 0}.history-titlebar{padding:0 14px}.history-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.history-chart-card{min-height:0}.history-window-controls{gap:12px}.history-tools{display:flex;justify-content:center;flex-wrap:wrap}}
   @media(max-width:520px){.showcase{padding:10px;border-radius:14px}.history-titlebar{min-height:44px;padding:0 10px}.history-title{gap:7px}.history-title strong{font-size:15px}.history-title span{font-size:10px}.history-window-controls{gap:7px}.history-app{padding:10px 8px 0}.history-toolbar{align-items:flex-start}.history-tabs{width:100%}.history-tab{flex:1}.history-tools{justify-content:flex-start;flex:1 1 100%;width:100%;gap:7px}.history-filter-group{flex:1 1 auto}.history-segment{max-width:100%;overflow-x:auto}.history-segment .history-control{padding:0 7px;font-size:11px}.history-actions{gap:4px}.history-control{padding:0 8px;font-size:11px}.history-kpis{gap:7px}.history-kpi{min-height:60px;padding:9px}.history-kpi strong{font-size:20px}.history-chart-card{padding:12px 9px 8px}.history-footer{font-size:9px}.history-chart text{font-size:11px}}
 
   /* ===== 主题展示 ===== */
@@ -349,13 +362,19 @@
       <h1>你的 <span class="ind">Codex</span> 用量，<br>一眼尽收</h1>
       <p class="lead">一个悬浮在桌角的胶囊小部件，实时显示本机 Codex CLI 登录账号的 5 小时与每周用量剩余。无边框、可贴边、可换肤，历史数据只存本地。</p>
       <div class="hero-ctas">
-        <a class="btn primary" href="/download">立即下载</a>
-        <a class="btn ghost" href="#features">查看功能特性</a>
+        <a class="btn primary install-download" data-icon-trigger href="/download">
+          <svg data-animated-icon data-animation="download" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><g class="download-arrow"><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></g></svg>
+          <span>立即下载</span>
+        </a>
+        <a class="btn ghost feature-preview" data-icon-trigger href="#features">
+          <svg data-animated-icon data-animation="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>查看功能特性</span>
+        </a>
       </div>
     </div>
     <div class="hero-visual">
       <div class="demo-stage">
-        <span class="stage-label"><i></i><span id="demoThemeLabel">胶囊预览 · 极简扁平主题</span></span>
+        <span class="stage-label"><i></i><span class="stage-label-copy"><span id="demoThemePrefix">胶囊预览 ·</span><strong id="demoThemeLabel">极简扁平主题</strong></span></span>
         <div class="demo-theme t-flat" id="demoTheme" data-theme-index="0">
           <i class="dot l demo-edge-dot" aria-hidden="true"></i>
           <div class="demo-capsule-wrap">
@@ -448,7 +467,7 @@
               <button type="button" class="history-tab" id="history-token-tab" role="tab" aria-selected="false" aria-controls="history-token-panel" data-history-tab="tokens" data-zh="Token 活动" data-en="Token activity">Token 活动</button>
             </div>
             <div class="history-tools" data-history-toolbar="quota">
-              <div class="history-filter-group"><span class="history-tool-label" data-zh="额度窗口" data-en="Usage window">额度窗口</span><span class="history-control" data-zh="每周　⌄" data-en="Weekly　⌄">每周　⌄</span></div>
+              <div class="history-filter-group"><span class="history-tool-label" data-zh="额度窗口" data-en="Usage window">额度窗口</span><span class="history-control" data-zh="每周" data-en="Weekly">每周</span></div>
               <div class="history-segment" aria-label="额度历史范围">
                 <span class="history-control is-active" data-zh="当前周期" data-en="Current period">当前周期</span>
                 <span class="history-control" data-zh="最近 7 天" data-en="Last 7 days">最近 7 天</span>
@@ -491,16 +510,58 @@
 
           <section class="showcase-pane" id="history-token-panel" role="tabpanel" aria-labelledby="history-token-tab" data-pane="tokens" data-history-panel="tokens" hidden>
             <div class="history-kpis">
-              <div class="history-kpi"><strong>—</strong><span data-zh="本范围总量" data-en="Total in range">本范围总量</span></div>
-              <div class="history-kpi"><strong>—</strong><span data-zh="本范围峰值" data-en="Peak in range">本范围峰值</span></div>
-              <div class="history-kpi"><strong>—</strong><span data-zh="日均" data-en="Daily average">日均</span></div>
-              <div class="history-kpi"><strong>0</strong><span data-zh="活跃天数" data-en="Active days">活跃天数</span></div>
+              <div class="history-kpi"><strong>522.6K</strong><span data-zh="本范围总量" data-en="Total in range">本范围总量</span></div>
+              <div class="history-kpi"><strong>28.4K</strong><span data-zh="本范围峰值" data-en="Peak in range">本范围峰值</span></div>
+              <div class="history-kpi"><strong>17.4K</strong><span data-zh="日均" data-en="Daily average">日均</span></div>
+              <div class="history-kpi"><strong>27</strong><span data-zh="活跃天数" data-en="Active days">活跃天数</span></div>
             </div>
             <div class="history-chart-card">
-              <div class="history-chart-head"><div><strong data-zh="Token 使用趋势" data-en="Token usage trend">Token 使用趋势</strong><span data-zh="按日期汇总的 Token 使用量" data-en="Token usage grouped by date">按日期汇总的 Token 使用量</span></div><div class="history-legend"><i></i><span>Token</span></div></div>
-              <div class="history-token-chart" data-zh="还没有记录 Token 活动" data-en="No token activity recorded yet">还没有记录 Token 活动</div>
+              <div class="history-chart-head"><div><strong data-zh="Token 使用趋势" data-en="Token usage trend">Token 使用趋势</strong><span data-zh="每日 Token 用量 · 示例数据" data-en="Daily token usage · Sample data">每日 Token 用量 · 示例数据</span></div><div class="history-legend"><i></i><span>Token</span></div></div>
+              <div class="history-token-chart">
+<svg class="history-token-svg" viewBox="0 0 960 340" role="img" aria-labelledby="token-chart-title">
+                <title id="token-chart-title">Daily Token activity, 30-day sample</title>
+                <line class="grid" x1="82" y1="34" x2="938" y2="34"/><line class="grid" x1="82" y1="117" x2="938" y2="117"/><line class="grid" x1="82" y1="200" x2="938" y2="200"/><line class="grid" x1="82" y1="284" x2="938" y2="284"/>
+                <text class="axis-label" x="66" y="38" text-anchor="end">30K</text><text class="axis-label" x="66" y="121" text-anchor="end">20K</text><text class="axis-label" x="66" y="204" text-anchor="end">10K</text><text class="axis-label" x="66" y="288" text-anchor="end">0</text>
+                <g class="token-bar"><title>2026-08-28 · 12.8K Tokens</title><rect x="88.0" y="177.3" width="16" height="106.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-08-29 · 18.4K Tokens</title><rect x="116.5" y="130.7" width="16" height="153.3" rx="3"/></g>
+                <g class="token-bar"><title>2026-08-30 · 0.0K Tokens</title><rect x="145.1" y="284.0" width="16" height="0.0" rx="3"/></g>
+                <g class="token-bar"><title>2026-08-31 · 21.7K Tokens</title><rect x="173.6" y="103.2" width="16" height="180.8" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-01 · 16.2K Tokens</title><rect x="202.1" y="149.0" width="16" height="135.0" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-02 · 23.5K Tokens</title><rect x="230.7" y="88.2" width="16" height="195.8" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-03 · 19.1K Tokens</title><rect x="259.2" y="124.8" width="16" height="159.2" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-04 · 14.8K Tokens</title><rect x="287.7" y="160.7" width="16" height="123.3" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-05 · 28.4K Tokens</title><rect x="316.3" y="47.3" width="16" height="236.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-06 · 17.6K Tokens</title><rect x="344.8" y="137.3" width="16" height="146.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-07 · 0.0K Tokens</title><rect x="373.3" y="284.0" width="16" height="0.0" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-08 · 22.1K Tokens</title><rect x="401.9" y="99.8" width="16" height="184.2" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-09 · 15.3K Tokens</title><rect x="430.4" y="156.5" width="16" height="127.5" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-10 · 19.8K Tokens</title><rect x="458.9" y="119.0" width="16" height="165.0" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-11 · 24.7K Tokens</title><rect x="487.5" y="78.2" width="16" height="205.8" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-12 · 18.9K Tokens</title><rect x="516.0" y="126.5" width="16" height="157.5" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-13 · 13.6K Tokens</title><rect x="544.5" y="170.7" width="16" height="113.3" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-14 · 21.4K Tokens</title><rect x="573.1" y="105.7" width="16" height="178.3" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-15 · 0.0K Tokens</title><rect x="601.6" y="284.0" width="16" height="0.0" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-16 · 26.2K Tokens</title><rect x="630.1" y="65.7" width="16" height="218.3" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-17 · 17.3K Tokens</title><rect x="658.7" y="139.8" width="16" height="144.2" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-18 · 20.6K Tokens</title><rect x="687.2" y="112.3" width="16" height="171.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-19 · 16.8K Tokens</title><rect x="715.7" y="144.0" width="16" height="140.0" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-20 · 23.1K Tokens</title><rect x="744.3" y="91.5" width="16" height="192.5" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-21 · 18.2K Tokens</title><rect x="772.8" y="132.3" width="16" height="151.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-22 · 11.9K Tokens</title><rect x="801.3" y="184.8" width="16" height="99.2" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-23 · 25.4K Tokens</title><rect x="829.9" y="72.3" width="16" height="211.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-24 · 14.6K Tokens</title><rect x="858.4" y="162.3" width="16" height="121.7" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-25 · 19.5K Tokens</title><rect x="886.9" y="121.5" width="16" height="162.5" rx="3"/></g>
+                <g class="token-bar"><title>2026-09-26 · 20.7K Tokens</title><rect x="915.5" y="111.5" width="16" height="172.5" rx="3"/></g>
+                <text class="axis-label" x="96.0" y="316" text-anchor="middle">08/28</text>
+                <text class="axis-label" x="267.2" y="316" text-anchor="middle">09/03</text>
+                <text class="axis-label" x="438.4" y="316" text-anchor="middle">09/09</text>
+                <text class="axis-label" x="609.6" y="316" text-anchor="middle">09/15</text>
+                <text class="axis-label" x="780.8" y="316" text-anchor="middle">09/21</text>
+                <text class="axis-label" x="923.5" y="316" text-anchor="middle">09/26</text>
+              </svg>
+              </div>
             </div>
-            <div class="history-footer"><span data-zh="本地记录，不上传数据" data-en="Stored locally. No data is uploaded.">本地记录，不上传数据</span><span data-zh="41 个额度采样点" data-en="41 usage samples">41 个额度采样点</span></div>
+            <div class="history-footer"><span data-zh="示例数据，仅用于界面演示" data-en="Sample data for display only">示例数据，仅用于界面演示</span><span data-zh="30 天 · 27 个活跃日" data-en="30 days · 27 active days">30 天 · 27 个活跃日</span></div>
           </section>
         </div>
       </div>
@@ -598,8 +659,8 @@
       en:{
         'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','header .nav-cta span':'Download',
         '.eyebrow span':'Windows desktop usage widget','.hero h1':'Your <span class="ind">Codex</span> usage,<br>at a glance','.hero p.lead':'A small capsule widget that floats in the corner of your desktop, showing the signed-in Codex CLI account’s remaining 5-hour and weekly usage in real time. Borderless, edge-snapping, and customizable, with history stored locally.',
-        '.hero-ctas .btn.primary':'Download now','.hero-ctas .btn.ghost':'Explore features',
-        '.demo-dots .dd:nth-child(1) span':'Steady usage','.demo-dots .dd:nth-child(2) span':'Fast usage','.demo-hint':'Click either side to view its reset time. It returns to the usage value after 5 seconds',
+        '#top .hero-ctas .btn.primary span':'Download now','#top .hero-ctas .btn.ghost span':'Explore features',
+        '.demo-dots .dd:nth-child(1) span':'Steady usage','.demo-dots .dd:nth-child(2) span':'Fast usage','.demo-hint':'Click either side to view its reset time. It returns to the usage value after 5 seconds','#demoThemePrefix':'Capsule preview ·',
         '#features .sec-head .kicker':'DUAL USAGE WINDOWS','#features .sec-head h2':'Two usage windows, easy to read at a glance','#features .sec-head p':'Blue shows the 5-hour window; dark gray shows the weekly window. See remaining usage early and avoid getting interrupted mid-task.',
         '#metL h3':'5-hour window','#metL .sub':'Blue progress · Current session remaining','#metL .meter .cap':'% remaining','#metL li:nth-child(1)':'Click the left side to view the reset time; it returns after 5 seconds','#metL li:nth-child(2)':'The outer dot shows recent usage speed; hover for an estimate',
         '#metR h3':'Weekly window','#metR .sub':'Dark progress · Weekly remaining','#metR .meter .cap':'% remaining','#metR li:nth-child(1)':'Switch between remaining and used values','#metR li:nth-child(2)':'Enable low-usage alerts at 10%, 20%, or 30%',
@@ -745,10 +806,10 @@
     var hl=document.getElementById('dhLeft'),hr=document.getElementById('dhRight');
     var demo=document.getElementById('demoTheme'),label=document.getElementById('demoThemeLabel');
     var themes=[
-      {className:'t-flat',zh:'胶囊预览 · 极简扁平主题',en:'Capsule preview · Minimal flat theme'},
-      {className:'t-skew',zh:'胶囊预览 · 立体拟物主题',en:'Capsule preview · Skeuomorphic theme'},
-      {className:'t-pixel',zh:'胶囊预览 · 像素游戏主题',en:'Capsule preview · Pixel game theme'},
-      {className:'t-neon',zh:'胶囊预览 · 霓虹夜光主题',en:'Capsule preview · Neon glow theme'}
+      {className:'t-flat',zh:'极简扁平主题',en:'Minimal flat theme'},
+      {className:'t-skew',zh:'立体拟物主题',en:'Skeuomorphic theme'},
+      {className:'t-pixel',zh:'像素游戏主题',en:'Pixel game theme'},
+      {className:'t-neon',zh:'霓虹夜光主题',en:'Neon glow theme'}
     ];
     var themeIndex=0,carouselTimer=null,fadeTimer=null;
     function updateThemeLabel(){var lang=window.capsuleSiteLanguage?window.capsuleSiteLanguage():'zh';label.textContent=themes[themeIndex][lang==='en'?'en':'zh'];}
@@ -838,6 +899,33 @@
       e.preventDefault();el.scrollIntoView({behavior:'smooth'});
     });
   });
+
+  // 本地 file:// 预览没有站点的 /download Edge Function，改为查询并下载最新 Windows 安装包。
+  if(window.location.protocol==='file:'){
+    var localDownloadLinks=document.querySelectorAll('a[href="/download"]');
+    var releaseApi='https://api.github.com/repos/percyho/codexc-apsule/releases/latest';
+    var releasePage='https://github.com/percyho/codexc-apsule/releases/latest';
+    var resolvingDownload=false;
+    localDownloadLinks.forEach(function(link){
+      link.addEventListener('click',async function(event){
+        event.preventDefault();
+        if(resolvingDownload)return;
+        resolvingDownload=true;
+        try{
+          var response=await fetch(releaseApi,{headers:{accept:'application/vnd.github+json','x-github-api-version':'2022-11-28'}});
+          if(!response.ok)throw new Error('Could not load the latest release');
+          var release=await response.json();
+          var installer=(release.assets||[]).find(function(asset){return asset.name&&asset.name.toLowerCase().endsWith('_x64-setup.exe')&&asset.browser_download_url;});
+          if(!installer)throw new Error('No Windows installer in the latest release');
+          var downloadUrl=new URL(installer.browser_download_url);
+          if(downloadUrl.protocol!=='https:'||downloadUrl.hostname!=='github.com'||!downloadUrl.pathname.startsWith('/percyho/codexc-apsule/releases/download/'))throw new Error('Unexpected installer URL');
+          window.location.assign(downloadUrl.href);
+        }catch(_){
+          window.location.assign(releasePage);
+        }
+      });
+    });
+  }
 </script>
 </body>
 </html>
