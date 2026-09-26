@@ -503,12 +503,12 @@
           <section class="showcase-pane" id="history-quota-panel" role="tabpanel" aria-labelledby="history-quota-tab" data-pane="quota" data-history-panel="quota">
             <div class="history-kpis">
               <div class="history-kpi"><strong data-quota-kpi="current">87%</strong><span data-zh="当前剩余" data-en="Current remaining">当前剩余</span></div>
-              <div class="history-kpi"><strong data-quota-kpi="lowest">86%</strong><span data-zh="最低剩余" data-en="Lowest remaining">最低剩余</span></div>
+              <div class="history-kpi"><strong data-quota-kpi="lowest">87%</strong><span data-zh="最低剩余" data-en="Lowest remaining">最低剩余</span></div>
               <div class="history-kpi"><strong data-quota-kpi="samples">41</strong><span data-zh="采样点数" data-en="Data points">采样点数</span></div>
               <div class="history-kpi"><strong data-quota-kpi="span">3.0h</strong><span data-zh="记录跨度" data-en="History span">记录跨度</span></div>
             </div>
             <div class="history-chart-card">
-              <div class="history-chart-head"><div><strong data-zh="每周剩余额度" data-en="Weekly remaining usage">每周剩余额度</strong><span data-zh="百分比越低，表示当前周期剩余额度越少" data-en="A lower percentage means less usage remains in this period">百分比越低，表示当前周期剩余额度越少</span></div><div class="history-legend"><i></i><span data-zh="剩余额度" data-en="Remaining usage">剩余额度</span></div></div>
+              <div class="history-chart-head"><div><strong data-quota-title data-zh="每周剩余额度" data-en="Weekly remaining usage">每周剩余额度</strong><span data-zh="百分比越低，表示当前周期剩余额度越少" data-en="A lower percentage means less usage remains in this period">百分比越低，表示当前周期剩余额度越少</span></div><div class="history-legend"><i></i><span data-zh="剩余额度" data-en="Remaining usage">剩余额度</span></div></div>
               <svg class="history-chart" viewBox="0 0 960 340" role="img" aria-label="每周剩余额度折线图">
                 <line class="grid" x1="72" y1="34" x2="938" y2="34"/><line class="grid" x1="72" y1="84" x2="938" y2="84"/><line class="grid" x1="72" y1="134" x2="938" y2="134"/><line class="grid" x1="72" y1="184" x2="938" y2="184"/><line class="grid" x1="72" y1="234" x2="938" y2="234"/><line class="grid" x1="72" y1="284" x2="938" y2="284"/>
                 <text x="32" y="38">100%</text><text x="40" y="88">80%</text><text x="40" y="138">60%</text><text x="40" y="188">40%</text><text x="40" y="238">20%</text><text x="47" y="288">0%</text>
@@ -517,7 +517,7 @@
                 <text data-quota-tick="0" x="180" y="316">09:00</text><text data-quota-tick="1" x="316" y="316">09:30</text><text data-quota-tick="2" x="452" y="316">10:00</text><text data-quota-tick="3" x="588" y="316">10:30</text><text data-quota-tick="4" x="724" y="316">11:00</text><text data-quota-tick="5" x="860" y="316">11:30</text>
               </svg>
             </div>
-            <div class="history-footer"><span data-zh="示例数据，仅用于界面演示" data-en="Sample data for display only">示例数据，仅用于界面演示</span><span data-quota-footer data-zh="41 个额度采样点" data-en="41 usage samples">41 个额度采样点</span></div>
+            <div class="history-footer"><span data-zh="本地记录，不上传数据" data-en="Stored locally. No data is uploaded.">本地记录，不上传数据</span><span data-quota-footer data-zh="41 个额度采样点" data-en="41 usage samples">41 个额度采样点</span></div>
           </section>
 
           <section class="showcase-pane" id="history-token-panel" role="tabpanel" aria-labelledby="history-token-tab" data-pane="tokens" data-history-panel="tokens" hidden>
@@ -677,6 +677,7 @@
       if(rangeGroups[1])rangeGroups[1].setAttribute('aria-label',next==='en'?'Token activity range':'Token 活动范围');
       var quotaChart=document.querySelector('#history-quota-panel .history-chart');
       if(quotaChart)quotaChart.setAttribute('aria-label',next==='en'?'Weekly remaining usage chart':'每周剩余额度折线图');
+      if(window.capsuleRefreshQuotaDemoLanguage)window.capsuleRefreshQuotaDemoLanguage();
       if(window.capsuleRefreshTokenDemoLanguage)window.capsuleRefreshTokenDemoLanguage();
     }
     function applyLanguage(next,rememberChoice){
@@ -704,46 +705,50 @@
     var toolbars=Array.from(document.querySelectorAll('#history-demo [data-history-toolbar]'));
     var quotaRangeButtons=Array.from(document.querySelectorAll('#history-demo [data-quota-range]'));
     var tokenRangeButtons=Array.from(document.querySelectorAll('#history-demo [data-token-range]'));
-    var selectedQuotaRange='current',selectedTokenRange='30d';
+    var selectedQuotaRange='current';
+    var selectedTokenRange='30d';
     var quotaConfigs={
-      current:{days:0,samples:41,span:'3.0h',start:90,end:87,wobble:0.8},
-      '7d':{days:7,samples:56,span:'7d',start:96,end:76,wobble:4.2},
-      '14d':{days:14,samples:112,span:'14d',start:97,end:68,wobble:5.2},
-      '30d':{days:30,samples:240,span:'30d',start:96,end:51,wobble:7.4}
+      current:{days:0,samples:41,span:'3.0h',start:90,end:87,wobble:0.3,titleZh:'每周剩余额度',titleEn:'Weekly remaining usage'},
+      '7d':{days:7,samples:56,span:'7d',start:96,end:76,wobble:4.2,titleZh:'最近 7 天剩余额度',titleEn:'Last 7 days remaining usage'},
+      '14d':{days:14,samples:112,span:'14d',start:97,end:68,wobble:5.2,titleZh:'最近 14 天剩余额度',titleEn:'Last 14 days remaining usage'},
+      '30d':{days:30,samples:240,span:'30d',start:96,end:51,wobble:7.4,titleZh:'最近一个月剩余额度',titleEn:'Last month remaining usage'}
     };
     function updateQuotaDemo(range){
       var config=quotaConfigs[range];if(!config)return;
       selectedQuotaRange=range;
       var lang=window.capsuleSiteLanguage?window.capsuleSiteLanguage():'zh';
       quotaRangeButtons.forEach(function(button){var active=button.getAttribute('data-quota-range')===range;button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',active?'true':'false');});
-      var points=range==='current'?41:31,values=[];
+      var points=config.samples,values=[];
       for(var i=0;i<points;i++){
         var t=i/(points-1),value=config.start+(config.end-config.start)*t+Math.sin(i*1.71)*config.wobble+Math.sin(i*.47)*config.wobble*.48;
         values.push(Math.max(0,Math.min(100,value)));
       }
       values[points-1]=config.end;
-      if(range==='current')values[Math.floor(points*.58)]=86;
       var lowest=Math.min.apply(null,values),current=Math.round(values[values.length-1]);
       document.querySelector('[data-quota-kpi="current"]').textContent=current+'%';
       document.querySelector('[data-quota-kpi="lowest"]').textContent=Math.round(lowest)+'%';
       document.querySelector('[data-quota-kpi="samples"]').textContent=String(config.samples);
       document.querySelector('[data-quota-kpi="span"]').textContent=config.span;
       var linePoints=values.map(function(value,index){return (72+866*index/(points-1)).toFixed(1)+' '+(284-value*2.5).toFixed(1);});
-      var linePath='M'+linePoints.join(' L'),areaPath=linePath+' L938 284 L72 284 Z';
+      var linePath='M'+linePoints.join(' L');
       document.querySelector('[data-quota-line]').setAttribute('d',linePath);
-      document.querySelector('[data-quota-area]').setAttribute('d',areaPath);
+      document.querySelector('[data-quota-area]').setAttribute('d',linePath+' L938 284 L72 284 Z');
       var ticks=Array.from(document.querySelectorAll('[data-quota-tick]'));
-      var today=new Date(),startDate=new Date(today);
-      if(config.days)startDate.setDate(today.getDate()-config.days+1);
+      var today=new Date();today.setHours(12,0,0,0);
+      var startDate=new Date(today);if(config.days)startDate.setDate(today.getDate()-config.days+1);
       ticks.forEach(function(tick,index){
         var progress=index/(ticks.length-1),label;
         if(!config.days){var minutes=9*60+progress*150;label=String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(Math.floor(minutes%60)).padStart(2,'0');}
-        else{var date=new Date(startDate);date.setDate(startDate.getDate()+Math.round(config.days*progress));label=lang==='en'?String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'):(date.getMonth()+1)+'/'+date.getDate();}
+        else{var date=new Date(startDate);date.setDate(startDate.getDate()+Math.round((config.days-1)*progress));label=lang==='en'?String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'):(date.getMonth()+1)+'/'+date.getDate();}
         tick.textContent=label;
       });
+      var title=document.querySelector('[data-quota-title]');
+      title.textContent=lang==='en'?config.titleEn:config.titleZh;
+      document.querySelector('#history-quota-panel .history-chart').setAttribute('aria-label',(lang==='en'?config.titleEn:config.titleZh)+(lang==='en'?' chart':'折线图'));
       document.querySelector('[data-quota-footer]').textContent=lang==='en'?config.samples+' usage samples':config.samples+' 个额度采样点';
     }
     quotaRangeButtons.forEach(function(button){button.addEventListener('click',function(){updateQuotaDemo(button.getAttribute('data-quota-range'));});});
+    window.capsuleRefreshQuotaDemoLanguage=function(){updateQuotaDemo(selectedQuotaRange);};
     var tokenConfigs={
       '7d':{days:7,seed:17,average:12.8,labelZh:'7 天',labelEn:'7-day'},
       '30d':{days:30,seed:31,average:17.4,labelZh:'30 天',labelEn:'30-day'},
