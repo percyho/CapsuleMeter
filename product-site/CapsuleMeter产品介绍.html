@@ -51,6 +51,12 @@
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .nav-cta{display:inline-flex;align-items:center;gap:8px;background:#303943;color:#fff;font-size:14px;font-weight:600;padding:9px 20px;border-radius:999px;transition:transform .2s,background .2s}
   .nav-cta:hover{transform:translateY(-1px);background:#3a4652}
+  a[href="/download"]{position:relative;isolation:isolate;overflow:hidden}
+  a[href="/download"] .download-progress{position:absolute;z-index:0;inset:0 auto 0 0;width:var(--download-progress,0%);border-radius:inherit;background:#050607;transition:width .12s linear;pointer-events:none}
+  a[href="/download"] .download-progress.is-indeterminate{width:36%;animation:download-progress-indeterminate 1.15s ease-in-out infinite}
+  a[href="/download"]>svg,a[href="/download"]>[data-download-label]{position:relative;z-index:1}
+  a[href="/download"][aria-busy="true"]{cursor:progress}
+  @keyframes download-progress-indeterminate{from{transform:translateX(-110%)}to{transform:translateX(300%)}}
   .download-arrow{transform:translateY(0);transition:transform .28s cubic-bezier(.2,.7,.2,1)}
   .install-download svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .install-download:hover .download-arrow,.install-download:focus-visible .download-arrow{transform:translateY(2px)}
@@ -319,6 +325,9 @@
   .cta-box{position:relative;text-align:center;max-width:680px;margin:0 auto}
   .cta-box h2{font-family:var(--font-d);font-size:clamp(28px,4vw,44px);font-weight:700;line-height:1.2;margin-bottom:18px;letter-spacing:-.3px}
   .cta-box p{color:var(--muted);font-size:17px;margin-bottom:34px}
+  .cta-box p a{color:var(--indigo);text-decoration:underline;text-decoration-color:rgba(120,169,255,.55);text-underline-offset:3px}
+  .cta-box p a:hover{color:#b5d5ff;text-decoration-color:currentColor}
+  .cta-box p a:focus-visible{outline:2px solid var(--indigo);outline-offset:3px;border-radius:2px}
   footer{border-top:1px solid var(--line);padding:34px 0}
   .foot-in{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
   .foot-in .brand span{font-size:13px}
@@ -349,7 +358,8 @@
         <span class="lang-label">EN</span>
       </button>
       <a class="nav-cta" href="/download">
-        <span>下载</span>
+        <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
+        <span data-download-label>下载</span>
       </a>
     </div>
   </div>
@@ -364,8 +374,9 @@
       <p class="lead">一个悬浮在桌角的胶囊小部件，实时显示本机 Codex CLI 登录账号的 5 小时与每周用量剩余。无边框、可贴边、可换肤，历史数据只存本地。</p>
       <div class="hero-ctas">
         <a class="btn primary install-download" data-icon-trigger href="/download">
+          <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
           <svg data-animated-icon data-animation="download" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><g class="download-arrow"><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></g></svg>
-          <span>立即下载</span>
+          <span data-download-label>立即下载</span>
         </a>
         <a class="btn ghost feature-preview" data-icon-trigger href="#features">
           <svg data-animated-icon data-animation="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -594,12 +605,14 @@
 <section class="cta-band" id="download">
   <div class="wrap cta-box">
     <h2>把用量放进桌角，把注意力留给代码</h2>
+    <p>支持开机自启、系统托盘与动态双层用量环。<a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT 开源协议</a>。</p>
     <div class="hero-ctas" style="justify-content:center">
       <a class="btn primary install-download" href="/download">
+        <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><g class="download-arrow"><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></g></svg>
-        <span>下载 Windows 安装包</span>
+        <span data-download-label>下载 Windows 安装包</span>
       </a>
-      <a class="btn ghost github-source" data-icon-trigger href="https://github.com/percyho/codexc-apsule" target="_blank" rel="noopener">
+      <a class="btn ghost github-source" data-icon-trigger href="https://github.com/percyho/CapsuleMeter" target="_blank" rel="noopener">
         <svg data-animated-icon viewBox="0 0 24 24" aria-hidden="true"><path class="github-body" d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path class="github-tail" d="M9 18c-4.51 2-5-2-7-2"/></svg>
         <span>查看源码 · GitHub</span>
       </a>
@@ -628,9 +641,9 @@
     var language=savedChoice||countryCookie||browserLanguage;
     var translations={
       en:{
-        'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','header .nav-cta span':'Download',
+        'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','header .nav-cta [data-download-label]':'Download',
         '.eyebrow span':'Windows desktop usage widget','.hero h1':'Your <span class="ind">Codex</span> usage,<br>at a glance','.hero p.lead':'A small capsule widget that floats in the corner of your desktop, showing the signed-in Codex CLI account’s remaining 5-hour and weekly usage in real time. Borderless, edge-snapping, and customizable, with history stored locally.',
-        '#top .hero-ctas .btn.primary span':'Download now','#top .hero-ctas .btn.ghost span':'Explore features',
+        '#top .hero-ctas .btn.primary [data-download-label]':'Download now','#top .hero-ctas .btn.ghost span':'Explore features',
         '.demo-dots .dd:nth-child(1) span':'Steady usage','.demo-dots .dd:nth-child(2) span':'Fast usage','.demo-hint':'Click either side to view its reset time. It returns to the usage value after 5 seconds','#demoThemePrefix':'Capsule preview ·',
         '#features .sec-head .kicker':'DUAL USAGE WINDOWS','#features .sec-head h2':'Two usage windows, easy to read at a glance','#features .sec-head p':'Blue shows the 5-hour window; dark gray shows the weekly window. See remaining usage early and avoid getting interrupted mid-task.',
         '#metL h3':'5-hour window','#metL .sub':'Blue progress · Current session remaining','#metL .meter .cap':'% remaining','#metL li:nth-child(1)':'Click the left side to view the reset time; it returns after 5 seconds','#metL li:nth-child(2)':'The outer dot shows recent usage speed; hover for an estimate',
@@ -648,7 +661,7 @@
         'body > section.sec:nth-of-type(6) .sec-head .kicker':'USAGE SPEED','body > section.sec:nth-of-type(6) .sec-head h2':'Colored dots show how quickly usage is changing','body > section.sec:nth-of-type(6) .sec-head p':'The dots on either side of the capsule correspond to the 5-hour and weekly limits. Their colors reflect recent usage speed; hover for an estimate.',
         '.sp.gray b':'Gray','.sp.gray span':'Evaluating · Not enough data','.sp.green b':'Green','.sp.green span':'Steady usage','.sp.blue b':'Blue','.sp.blue span':'Normal usage','.sp.orange b':'Orange','.sp.orange span':'Fast usage','.sp.red b':'Red','.sp.red span':'Very fast usage',
         '#privacy h3':'Privacy commitment','#privacy .priv li:nth-child(1)':'<b>Tokens stay on your device</b> — Access, refresh, and ID tokens are used only by the local Rust backend. They are never exposed to the frontend or third parties.','#privacy .priv li:nth-child(2)':'<b>Only the account email is shown</b> — The email is read locally from the ID token. No other sensitive information is displayed.','#privacy .priv li:nth-child(3)':'<b>History stays on your device</b> — Usage samples are stored locally. Export them or clear them at any time.',
-        '#download h2':'Keep usage in the corner and focus on your code','#download .btn.primary span':'Download for Windows','#download .btn.ghost span':'View source · GitHub',
+        '#download h2':'Keep usage in the corner and focus on your code','#download p':'Supports launch at startup, the system tray, and a live dual-window usage display. <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT License</a>.','#download .btn.primary [data-download-label]':'Download for Windows','#download .btn.ghost span':'View source · GitHub',
         '.foot-links a:nth-child(1)':'Features','.foot-links a:nth-child(2)':'History','.foot-links a:nth-child(3)':'Themes','.foot-links a:nth-child(4)':'Privacy','footer .foot-in > span':'© 2026 Capsule Meter · Windows x64'
       }
     };
@@ -664,6 +677,7 @@
       if(rangeGroups[1])rangeGroups[1].setAttribute('aria-label',next==='en'?'Token activity range':'Token 活动范围');
       var quotaChart=document.querySelector('#history-quota-panel .history-chart');
       if(quotaChart)quotaChart.setAttribute('aria-label',next==='en'?'Weekly remaining usage chart':'每周剩余额度折线图');
+      if(window.capsuleRefreshTokenDemoLanguage)window.capsuleRefreshTokenDemoLanguage();
     }
     function applyLanguage(next,rememberChoice){
       language=next;
@@ -965,32 +979,116 @@
     });
   });
 
-  // 本地 file:// 预览没有站点的 /download Edge Function，改为查询并下载最新 Windows 安装包。
-  if(window.location.protocol==='file:'){
-    var localDownloadLinks=document.querySelectorAll('a[href="/download"]');
+  // Stream the installer through the same-origin Netlify endpoint so the page can show byte-level progress.
+  (function(){
+    var downloadLinks=Array.from(document.querySelectorAll('a[href="/download"]'));
+    if(!downloadLinks.length)return;
+    var streamProxy='https://capsule-meter-product-preview.netlify.app/download?progress=1';
     var releaseApi='https://api.github.com/repos/percyho/CapsuleMeter/releases/latest';
     var releasePage='https://github.com/percyho/CapsuleMeter/releases/latest';
-    var resolvingDownload=false;
-    localDownloadLinks.forEach(function(link){
+    var releaseAssetPrefix='/percyho/CapsuleMeter/releases/download/';
+    var busy=false,resetTimer;
+    function isEnglish(){return window.capsuleSiteLanguage&&window.capsuleSiteLanguage()==='en';}
+    function idleLabel(link){
+      if(link.classList.contains('nav-cta'))return isEnglish()?'Download':'下载';
+      if(link.closest('#top'))return isEnglish()?'Download now':'立即下载';
+      return isEnglish()?'Download for Windows':'下载 Windows 安装包';
+    }
+    function message(link,state,percent){
+      var en=isEnglish();
+      if(state==='preparing')return en?'Preparing…':'准备下载…';
+      if(state==='downloading')return percent===null?(en?'Downloading…':'正在下载…'):(en?'Downloading '+percent+'%':'正在下载 '+percent+'%');
+      if(state==='saving')return en?'Saving installer…':'正在保存安装包…';
+      if(state==='complete')return en?'Download started':'已开始下载';
+      if(state==='fallback')return en?'Starting direct download…':'正在启动直接下载…';
+      return idleLabel(link);
+    }
+    function setState(link,state,percent){
+      var progress=link.querySelector('.download-progress'),label=link.querySelector('[data-download-label]');
+      if(!progress||!label)return;
+      link.setAttribute('aria-busy',state==='preparing'||state==='downloading'||state==='saving'?'true':'false');
+      link.dataset.downloadState=state;
+      progress.classList.toggle('is-indeterminate',percent===null);
+      progress.style.setProperty('--download-progress',(percent===null?36:Math.max(0,Math.min(100,percent)))+'%');
+      progress.setAttribute('aria-valuenow',String(percent===null?0:Math.round(percent)));
+      progress.setAttribute('aria-hidden',state==='idle'?'true':'false');
+      progress.setAttribute('aria-label',isEnglish()?'Download progress':'下载进度');
+      label.textContent=message(link,state,percent);
+      label.setAttribute('aria-live','polite');
+    }
+    function restore(link){
+      setState(link,'idle',0);
+      link.removeAttribute('aria-busy');
+      link.removeAttribute('data-download-state');
+    }
+    function isInstallerResponse(response){
+      var contentType=(response.headers.get('content-type')||'').toLowerCase();
+      return response.ok&&!!response.body&&contentType.indexOf('application/octet-stream')!==-1;
+    }
+    async function getProgressResponse(){
+      if(window.location.protocol!=='file:'){
+        try{
+          var sameOrigin=await fetch('/download?progress=1',{cache:'no-store'});
+          if(isInstallerResponse(sameOrigin))return sameOrigin;
+        }catch(_){}
+      }
+      var proxied=await fetch(streamProxy,{cache:'no-store'});
+      if(!isInstallerResponse(proxied))throw new Error('Streaming download is unavailable');
+      return proxied;
+    }
+    function installerFilename(disposition){
+      var match=(disposition||'').match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i),filename='CodexCapsuleSetup.exe';
+      if(match){try{filename=decodeURIComponent(match[1]||match[2]);}catch(_){filename=match[1]||match[2];}}
+      return filename.replace(/[\\/:*?"<>|]/g,'_');
+    }
+    function saveInstaller(blob,filename){
+      var objectUrl=URL.createObjectURL(blob),anchor=document.createElement('a');
+      anchor.href=objectUrl;anchor.download=filename;anchor.hidden=true;document.body.appendChild(anchor);anchor.click();anchor.remove();
+      window.setTimeout(function(){URL.revokeObjectURL(objectUrl);},60000);
+    }
+    async function startDirectDownload(){
+      if(window.location.protocol!=='file:'){window.location.assign('/download');return;}
+      try{
+        var response=await fetch(releaseApi,{headers:{accept:'application/vnd.github+json','x-github-api-version':'2022-11-28'}});
+        if(!response.ok)throw new Error('Latest release unavailable');
+        var release=await response.json();
+        var installer=(release.assets||[]).find(function(asset){return asset.name&&asset.name.toLowerCase().endsWith('_x64-setup.exe')&&asset.browser_download_url;});
+        if(!installer)throw new Error('Windows installer unavailable');
+        var url=new URL(installer.browser_download_url);
+        if(url.protocol!=='https:'||url.hostname!=='github.com'||!url.pathname.startsWith(releaseAssetPrefix))throw new Error('Unexpected installer URL');
+        window.location.assign(url.href);
+      }catch(_){window.location.assign(releasePage);}
+    }
+    async function download(link){
+      var response=await getProgressResponse();
+      var total=Number(response.headers.get('content-length'))||0,loaded=0,reader=response.body.getReader(),chunks=[];
+      setState(link,'downloading',total?0:null);
+      while(true){
+        var result=await reader.read();
+        if(result.done)break;
+        chunks.push(result.value);loaded+=result.value.byteLength;
+        setState(link,'downloading',total?Math.min(99,loaded/total*100):null);
+      }
+      setState(link,'saving',100);
+      var blob=new Blob(chunks,{type:response.headers.get('content-type')||'application/octet-stream'});
+      saveInstaller(blob,installerFilename(response.headers.get('content-disposition')));
+      setState(link,'complete',100);
+    }
+    downloadLinks.forEach(function(link){
       link.addEventListener('click',async function(event){
         event.preventDefault();
-        if(resolvingDownload)return;
-        resolvingDownload=true;
-        try{
-          var response=await fetch(releaseApi,{headers:{accept:'application/vnd.github+json','x-github-api-version':'2022-11-28'}});
-          if(!response.ok)throw new Error('Could not load the latest release');
-          var release=await response.json();
-          var installer=(release.assets||[]).find(function(asset){return asset.name&&asset.name.toLowerCase().endsWith('_x64-setup.exe')&&asset.browser_download_url;});
-          if(!installer)throw new Error('No Windows installer in the latest release');
-          var downloadUrl=new URL(installer.browser_download_url);
-          if(downloadUrl.protocol!=='https:'||downloadUrl.hostname!=='github.com'||!downloadUrl.pathname.startsWith('/percyho/CapsuleMeter/releases/download/'))throw new Error('Unexpected installer URL');
-          window.location.assign(downloadUrl.href);
-        }catch(_){
-          window.location.assign(releasePage);
+        if(busy)return;
+        busy=true;if(resetTimer)window.clearTimeout(resetTimer);
+        setState(link,'preparing',null);
+        try{await download(link);}
+        catch(_){setState(link,'fallback',0);await startDirectDownload();}
+        finally{
+          busy=false;
+          resetTimer=window.setTimeout(function(){restore(link);},4000);
         }
       });
     });
-  }
+  })();
 </script>
 </body>
 </html>

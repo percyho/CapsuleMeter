@@ -22,7 +22,21 @@ function redirect(location: string, cacheSeconds = 60): Response {
   });
 }
 
-export default async function latestWindowsDownload(): Promise<Response> {
+function progressError(message: string): Response {
+  return new Response(message, {
+    status: 502,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "Content-Length, Content-Disposition, Content-Type",
+      "Cache-Control": "no-store",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
+export default async function latestWindowsDownload(request: Request): Promise<Response> {
+  const streamForProgress = new URL(request.url).searchParams.get("progress") === "1";
+
   try {
     const response = await fetch(RELEASE_API, {
       headers: {
@@ -32,14 +46,22 @@ export default async function latestWindowsDownload(): Promise<Response> {
       },
     });
 
-    if (!response.ok) return redirect(RELEASE_PAGE, 15);
+    if (!response.ok) {
+      return streamForProgress
+        ? progressError("Could not load the latest release")
+        : redirect(RELEASE_PAGE, 15);
+    }
 
     const release = (await response.json()) as GitHubRelease;
     const installer = release.assets?.find((asset) =>
       asset.name?.toLowerCase().endsWith("_x64-setup.exe")
     );
 
-    if (!installer?.browser_download_url) return redirect(RELEASE_PAGE, 15);
+    if (!installer?.name || !installer.browser_download_url) {
+      return streamForProgress
+        ? progressError("No Windows installer was found")
+        : redirect(RELEASE_PAGE, 15);
+    }
 
     const downloadUrl = new URL(installer.browser_download_url);
     if (
@@ -47,18 +69,44 @@ export default async function latestWindowsDownload(): Promise<Response> {
       downloadUrl.hostname !== "github.com" ||
       !downloadUrl.pathname.startsWith(RELEASE_ASSET_PREFIX)
     ) {
-      return redirect(RELEASE_PAGE, 15);
+      return streamForProgress
+        ? progressError("The installer URL was not accepted")
+        : redirect(RELEASE_PAGE, 15);
+    }
+
+    if (streamForProgress) {
+      const assetResponse = await fetch(downloadUrl.href);
+      if (!assetResponse.ok || !assetResponse.body) {
+        return progressError("Could not stream the Windows installer");
+      }
+
+      const safeFilename = installer.name.replace(/[\\/:*?"<>|\r\n]/g, "_");
+      const headers = new Headers({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Expose-Headers": "Content-Length, Content-Disposition, Content-Type",
+        "Cache-Control": "no-store",
+        "Content-Type": assetResponse.headers.get("content-type") || "application/octet-stream",
+        "Content-Disposition": assetResponse.headers.get("content-disposition") ||
+          `attachment; filename="${safeFilename}"`,
+        "X-Content-Type-Options": "nosniff",
+      });
+      const contentLength = assetResponse.headers.get("content-length");
+      if (contentLength) headers.set("Content-Length", contentLength);
+
+      return new Response(assetResponse.body, { status: 200, headers });
     }
 
     return redirect(downloadUrl.href);
   } catch {
-    return redirect(RELEASE_PAGE, 15);
+    return streamForProgress
+      ? progressError("The Windows installer is temporarily unavailable")
+      : redirect(RELEASE_PAGE, 15);
   }
 }
 
 export const config: Config = {
   path: "/download",
-  method: ["GET", "HEAD"],
+  method: "GET",
   cache: "manual",
   onError: "bypass",
 };
