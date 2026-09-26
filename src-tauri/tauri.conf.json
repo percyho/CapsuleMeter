@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CodexCapsule",
+  "productName": "CapsuleMeter",
   "version": "1.1.0",
   "identifier": "com.codexcapsule.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Codex Capsule",
+        "title": "Capsule Meter",
         "width": 300,
         "height": 225,
         "minWidth": 140,

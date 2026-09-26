@@ -106,8 +106,8 @@ fn run_rpc(method: &str, params: Value) -> Result<Value, String> {
                 "id": 1,
                 "params": {
                     "clientInfo": {
-                        "name": "codex_capsule",
-                        "title": "Codex Capsule",
+                        "name": "capsule_meter",
+                        "title": "Capsule Meter",
                         "version": env!("CARGO_PKG_VERSION")
                     }
                 }

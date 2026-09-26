@@ -1,6 +1,6 @@
 # Changelog
 
-本文件记录 Codex Capsule 桌面小组件的版本变更。
+本文件记录 Capsule Meter 桌面小组件的版本变更。
 
 ## [Unreleased]
 

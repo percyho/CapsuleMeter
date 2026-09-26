@@ -28,7 +28,7 @@
 
 ### Release 页面填写
 - Tag：`vX.Y.Z`
-- 标题：`Codex Capsule vX.Y.Z`
+- 标题：`Capsule Meter vX.Y.Z`
 - 描述：
 
 ```markdown
@@ -39,11 +39,11 @@
 
 ## 安装
 
-下载并运行 `CodexCapsule_X.Y.Z_x64-setup.exe`。
+下载并运行 `CapsuleMeter_X.Y.Z_x64-setup.exe`。
 ```
 
 ### 构建产物
-- Windows 安装包：`src-tauri/target/release/bundle/nsis/CodexCapsule_X.Y.Z_x64-setup.exe`
+- Windows 安装包：`src-tauri/target/release/bundle/nsis/CapsuleMeter_X.Y.Z_x64-setup.exe`
 
 ### 发布执行结果
 - 构建：成功 / 失败（必要时说明原因）

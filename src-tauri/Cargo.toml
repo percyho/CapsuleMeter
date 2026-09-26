@@ -1,11 +1,11 @@
 [package]
-name = "codex-capsule"
+name = "capsule-meter"
 version = "0.1.0"
 description = "Codex 用量胶囊小组件"
 edition = "2021"
 
 [lib]
-name = "codex_capsule_lib"
+name = "capsule_meter_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

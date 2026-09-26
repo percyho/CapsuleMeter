@@ -7,7 +7,7 @@ const locale = shallowRef<AppLocale>(stored === "en-US" ? "en-US" : "zh-CN");
 
 const en: Record<string, string> = {
   "设置": "Settings",
-  "个性化用量胶囊": "Customize Codex Capsule",
+  "个性化用量胶囊": "Customize Capsule Meter",
   "数据异常": "Data unavailable",
   "未登录": "Signed out",
   "关闭设置": "Close settings",
@@ -103,7 +103,7 @@ const en: Record<string, string> = {
   "还没有记录额度历史": "No usage history yet",
   "还没有记录 Token 活动": "No token activity yet",
   "数据保存在本机，统计图不会上传历史记录。": "History and charts stay on this device.",
-  "Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。": "Codex Capsule has no account system and does not collect, sell, or sync your usage data.",
+  "Capsule Meter 不提供账号系统，也不会收集、出售或同步你的使用数据。": "Capsule Meter has no account system and does not collect, sell, or sync your usage data.",
   "认证信息": "Credentials",
   "仅在本机读取 Codex 登录凭据；访问令牌不会显示在界面或写入历史记录。": "Codex credentials are read locally; access tokens are never displayed or written to history.",
   "网络请求": "Network",

@@ -1587,7 +1587,7 @@ onBeforeUnmount(() => {
             <p class="privacy-summary">
               {{
                 t(
-                  "Codex Capsule 不提供账号系统，也不会收集、出售或同步你的使用数据。",
+                  "Capsule Meter 不提供账号系统，也不会收集、出售或同步你的使用数据。",
                 )
               }}
             </p>

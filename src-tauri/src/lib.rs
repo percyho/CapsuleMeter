@@ -80,7 +80,7 @@ async fn check_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
     let current = app.package_info().version.to_string();
     let result = reqwest::Client::new()
         .get("https://gitee.com/api/v5/repos/siteweb/codexc-apsule/releases/latest")
-        .header("User-Agent", "CodexCapsule")
+        .header("User-Agent", "CapsuleMeter")
         .send()
         .await;
     let response = match result {
