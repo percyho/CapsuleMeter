@@ -1,4 +1,4 @@
-# CodexCapsule — Codex Usage Capsule
+# CapsuleMeter — Codex Usage Capsule
 
 **English** | [中文](中文文档.md)
 
@@ -9,11 +9,11 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-A compact 140×34 desktop widget that displays the remaining usage for the locally authenticated **Codex CLI** ChatGPT account.
+A compact desktop widget that displays the remaining usage for the locally authenticated **Codex CLI** ChatGPT account.
 
 ## Features
 
-- **Capsule window**: A frameless 140×34 capsule showing the 5-hour and weekly usage windows side by side.
+- **Capsule window**: A frameless capsule bar (window 300×225) showing the 5-hour and weekly usage windows side by side.
 - **Window dragging**: Drag the capsule to reposition it. It automatically snaps to screen edges and corners while avoiding the taskbar, and restores its position after restart.
 - **Left side**: Shows the remaining percentage for the 5-hour window with an indigo gradient fill.
 - **Right side**: Shows the remaining percentage for the weekly window with a coral-to-rose gradient fill.
@@ -34,7 +34,10 @@ A compact 140×34 desktop widget that displays the remaining usage for the local
   - **Show capsule**: Hide the capsule and restore it later from the tray or with the global shortcut.
   - All settings are saved automatically and restored after restart.
 - **Automatic refresh**: Fetches updated usage from the OpenAI backend every five minutes by default; the interval is configurable from 1 to 30 minutes.
-- **Usage history**: Includes quota and token trends, retention settings, manual refresh, clearing, and CSV export.
+- **Usage history**: Opens a dedicated 920×600 **Usage History** window from the Stats tab in the settings panel. It includes two tabs:
+  - **Quota history**: A segmented selector for the quota window (weekly) and a mode segmented control (current period, last 7/14 days, last month, browse). Shows KPI cards (current remaining, lowest remaining, sample count, span) and an ECharts line chart of remaining percentage over time.
+  - **Token activity**: A range selector (7/30/90 days, 1 year, all) with KPI cards (total, peak, daily average, active days) and a daily token bar chart.
+  - Both tabs offer refresh, **Export CSV** (downloads the local quota samples), and a red **Clear history** button. Retention (7/30/90/365 days) is configurable in the settings panel.
 - **Usage reset credits**: Shows available reset credits and expiration details, with a two-step confirmation before resetting both weekly and 5-hour limits.
 - **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. Notifications can be enabled or disabled with 10%, 20%, or 30% thresholds. The tray icon can use the app logo or dynamic dual usage rings.
 - **Consumption speed**: The dots outside the capsule show recent consumption speed: gray = assessing (not enough data), green = slow, blue = normal, orange = fast, and red = critical. The left dot is for the 5-hour window and the right dot is for the weekly window. Hover over the corresponding capsule side to see the estimate.
@@ -85,19 +88,19 @@ node scripts/bump-version.js patch   # Or minor / major
 
 ## Release and Build Outputs
 
-The current release is **v1.0.2**. The Windows x64 NSIS installer is produced at:
+The current release is **v1.1.0**. The Windows x64 NSIS installer is produced at:
 
 ```text
-Executable:  src-tauri/target/release/codex-capsule.exe
-Installer:   src-tauri/target/release/bundle/nsis/CodexCapsule_<version>_x64-setup.exe
+Executable:  src-tauri/target/release/capsule-meter.exe
+Installer:   src-tauri/target/release/bundle/nsis/CapsuleMeter_<version>_x64-setup.exe
 ```
 
-The executable and installer are local build artifacts and are not committed to the repository. To publish a release, build the desired version, commit the version changes, create a matching Git tag (for example, `v1.0.2`), and push the commit and tag to the remote repository.
+The executable and installer are local build artifacts and are not committed to the repository. To publish a release, build the desired version, commit the version changes, create a matching Git tag (for example, `v1.1.0`), and push the commit and tag to the remote repository.
 
 ## Project Structure
 
 ```text
-codexcApsule/
+capsule-meter/
 ├── src/                    # Vue 3 frontend
 │   ├── App.vue             # Capsule window and settings panel
 │   ├── components/         # Statistics, reset credits, appearance, and shared UI components
@@ -111,7 +114,7 @@ codexcApsule/
 │   │   ├── usage.rs        # Reads authentication and requests usage data
 │   │   ├── window_pos.rs   # Window-position persistence
 │   │   └── lib.rs          # Application entry point
-│   └── tauri.conf.json     # Window configuration (140×34 capsule, frameless, always on top)
+│   └── tauri.conf.json     # Window configuration (capsule 300×225, frameless, always on top; history 920×600)
 ```
 
 ## Known Limitations
