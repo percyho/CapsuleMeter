@@ -270,7 +270,7 @@ const rightValue = computed(() => {
 });
 
 const speedColors: Record<ConsumptionSpeedState, string> = {
-  unknown: "rgba(148, 163, 184, 0.55)",
+  unknown: "#94a3b8",
   idle: "#55d6a8",
   steady: "#55a7ff",
   fast: "#f5a524",
@@ -419,7 +419,7 @@ async function refresh() {
     const data = await invoke<UsageData>("fetch_usage");
     usage.value = data;
     lastError.value = data.error ?? null;
-    if (!data.error) await updateTrayIcon(data);
+    await updateTrayIcon(data);
     if (!data.error) await maybeNotifyLowUsage(data);
   } catch (e) {
     lastError.value = String(e);
@@ -496,11 +496,14 @@ function applyWindowSettings() {
 }
 
 async function updateTrayIcon(data = usage.value) {
+  if (!data) return;
   try {
     await invoke("update_tray_icon", {
       mode: trayIconMode.value,
-      fiveHour: data?.five_hour.remaining_percent ?? 0,
-      weekly: data?.weekly.remaining_percent ?? 0,
+      fiveHour: data.five_hour.remaining_percent,
+      weekly: data.weekly.remaining_percent,
+      fiveHourResetAfterSeconds: data.five_hour.reset_after_seconds,
+      weeklyResetAfterSeconds: data.weekly.reset_after_seconds,
     });
   } catch (reason) {
     systemMessage.value = String(reason);
@@ -837,41 +840,48 @@ function onPanelResizeEnd() {
 }
 
 const panelAlignRight = ref(false);
+let panelGeometryChanging = false;
 
 async function togglePanel() {
-  showPanel.value = !showPanel.value;
+  if (panelGeometryChanging) return;
+  panelGeometryChanging = true;
   const win = getCurrentWindow() as any;
-  if (showPanel.value) {
-    // 用 screenX 判断（Tauri webview 中 screenX = 窗口在屏幕上的 x）
-    const winX = window.screenX;
-    const winY = window.screenY;
-    const screenW = window.screen.availWidth;
-    console.log("DEBUG:", { winX, winY, screenW, panelW: panelW.value });
-    panelAlignRight.value = winX + panelW.value > screenW;
-    await win.setSize(
-      new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value),
-    );
-    if (panelAlignRight.value) {
-      await win.setPosition(
-        new LogicalPosition(winX - (panelW.value - CAPSULE_WIDTH), winY),
-      );
+  try {
+    if (!showPanel.value) {
+      // 用 screenX 判断（Tauri webview 中 screenX = 窗口在屏幕上的 x）
+      const winX = window.screenX;
+      const winY = window.screenY;
+      const shouldAlignRight = winX + panelW.value > window.screen.availWidth;
+      panelAlignRight.value = shouldAlignRight;
+      const targetX = shouldAlignRight
+        ? winX - (panelW.value - CAPSULE_WIDTH)
+        : winX;
+      await Promise.all([
+        win.setSize(new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value)),
+        win.setPosition(new LogicalPosition(targetX, winY)),
+      ]);
+      showPanel.value = true;
+    } else {
+      const winX = window.screenX;
+      const winY = window.screenY;
+      const targetX = panelAlignRight.value
+        ? winX + (panelW.value - CAPSULE_WIDTH)
+        : winX;
+      await Promise.all([
+        win.setSize(new LogicalSize(CAPSULE_WIDTH, CAPSULE_HEIGHT)),
+        win.setPosition(new LogicalPosition(targetX, winY)),
+      ]);
+      showPanel.value = false;
+      panelAlignRight.value = false;
     }
-  } else {
-    // 关闭面板时恢复窗口宽度和位置
-    const winX = window.screenX;
-    const winY = window.screenY;
-    await win.setSize(new LogicalSize(CAPSULE_WIDTH, CAPSULE_HEIGHT));
-    if (panelAlignRight.value) {
-      await win.setPosition(
-        new LogicalPosition(winX + (panelW.value - CAPSULE_WIDTH), winY),
-      );
-    }
-    panelAlignRight.value = false;
+  } finally {
+    panelGeometryChanging = false;
   }
 }
 
 function onContextMenu(e: MouseEvent) {
   e.preventDefault();
+  e.stopPropagation();
   togglePanel();
 }
 
@@ -951,7 +961,6 @@ onMounted(() => {
   void applyGlobalShortcut().catch((reason) => {
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   });
-  void updateTrayIcon();
   if (!capsuleVisible.value) void getCurrentWindow().hide();
   void listen("tray-refresh", () => void refresh()).then((unlisten) =>
     unlistenEvents.push(unlisten),
@@ -2010,6 +2019,40 @@ body {
 .speed-indicator--right {
   right: 0;
   background: var(--speed-right);
+}
+
+.capsule-flat + .speed-indicators {
+  left: 20px;
+  right: 20px;
+}
+
+.capsule-flat + .speed-indicators .speed-indicator {
+  display: none;
+}
+
+.capsule-flat + .speed-indicators::before,
+.capsule-flat + .speed-indicators::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border: 2px solid;
+  content: "";
+  pointer-events: none;
+}
+
+.capsule-flat + .speed-indicators::before {
+  left: 0;
+  border-color: var(--speed-left);
+  border-right: 0;
+  border-radius: 999px 0 0 999px;
+}
+
+.capsule-flat + .speed-indicators::after {
+  right: 0;
+  border-color: var(--speed-right);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
 }
 
 .capsule-pixel .speed-indicator {

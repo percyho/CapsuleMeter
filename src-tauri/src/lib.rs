@@ -176,19 +176,63 @@ fn usage_ring_icon(five_hour: f64, weekly: f64) -> tauri::image::Image<'static> 
     tauri::image::Image::new_owned(rgba, size, size)
 }
 
+fn tray_reset_hint(seconds: Option<i64>) -> String {
+    let Some(seconds) = seconds else {
+        return String::new();
+    };
+    if seconds <= 0 {
+        return " · 即将重置".to_string();
+    }
+
+    let minutes = seconds / 60;
+    let days = minutes / (24 * 60);
+    let hours = (minutes / 60) % 24;
+    let remaining_minutes = minutes % 60;
+    let duration = if days > 0 {
+        format!("{days}天{hours}小时")
+    } else if hours > 0 {
+        format!("{hours}小时{remaining_minutes}分")
+    } else {
+        format!("{}分", remaining_minutes.max(1))
+    };
+    format!(" · {duration}后重置")
+}
+
+fn tray_usage_hint(label: &str, remaining: Option<f64>, reset_after: Option<i64>) -> String {
+    let remaining = remaining
+        .map(|value| format!("{value:.0}%"))
+        .unwrap_or_else(|| "—".to_string());
+    format!("{label} {remaining}{}", tray_reset_hint(reset_after))
+}
+
+fn tray_tooltip(
+    five_hour: Option<f64>,
+    weekly: Option<f64>,
+    five_hour_reset_after_seconds: Option<i64>,
+    weekly_reset_after_seconds: Option<i64>,
+) -> String {
+    format!(
+        "{} | {}",
+        tray_usage_hint("5小时", five_hour, five_hour_reset_after_seconds),
+        tray_usage_hint("每周", weekly, weekly_reset_after_seconds),
+    )
+}
+
 #[tauri::command]
 fn update_tray_icon(
     app: tauri::AppHandle,
     mode: String,
-    five_hour: f64,
-    weekly: f64,
+    five_hour: Option<f64>,
+    weekly: Option<f64>,
+    five_hour_reset_after_seconds: Option<i64>,
+    weekly_reset_after_seconds: Option<i64>,
 ) -> Result<(), String> {
     let normalized_mode = if mode == "usage" { "usage" } else { "logo" };
     let tray = app
         .tray_by_id("main-tray")
         .ok_or_else(|| "托盘尚未初始化".to_string())?;
     let icon = if normalized_mode == "usage" {
-        usage_ring_icon(five_hour, weekly)
+        usage_ring_icon(five_hour.unwrap_or(0.0), weekly.unwrap_or(0.0))
     } else {
         app.default_window_icon()
             .cloned()
@@ -196,14 +240,12 @@ fn update_tray_icon(
     };
     tray.set_icon(Some(icon))
         .map_err(|error| format!("更新托盘图标失败：{error}"))?;
-    let tooltip = if normalized_mode == "usage" {
-        format!(
-            "Codex Capsule · 5 小时 {:.0}% · 每周 {:.0}%",
-            five_hour, weekly
-        )
-    } else {
-        "Codex Capsule".to_string()
-    };
+    let tooltip = tray_tooltip(
+        five_hour,
+        weekly,
+        five_hour_reset_after_seconds,
+        weekly_reset_after_seconds,
+    );
     tray.set_tooltip(Some(tooltip))
         .map_err(|error| format!("更新托盘提示失败：{error}"))?;
     app.state::<TrayIconMenuState>().select(normalized_mode)
@@ -211,7 +253,7 @@ fn update_tray_icon(
 
 #[cfg(test)]
 mod tests {
-    use super::usage_ring_icon;
+    use super::{tray_reset_hint, tray_tooltip, tray_usage_hint, usage_ring_icon};
 
     const TRACK_COLOR: [u8; 4] = [209, 213, 219, 255];
 
@@ -245,6 +287,22 @@ mod tests {
         let image = usage_ring_icon(0.0, 0.0);
 
         assert!(count_pixels(&image, TRACK_COLOR) > 0);
+    }
+
+    #[test]
+    fn tray_tooltip_includes_remaining_usage_and_reset_context() {
+        assert_eq!(
+            tray_usage_hint("5小时", Some(82.4), Some(7_500)),
+            "5小时 82% · 2小时5分后重置"
+        );
+        assert_eq!(tray_reset_hint(None), "");
+        assert_eq!(tray_reset_hint(Some(0)), " · 即将重置");
+        let tooltip = tray_tooltip(Some(82.4), Some(57.0), Some(7_500), Some(259_200));
+        assert_eq!(
+            tooltip,
+            "5小时 82% · 2小时5分后重置 | 每周 57% · 3天0小时后重置"
+        );
+        assert!(!tooltip.contains("Codex"));
     }
 }
 
@@ -308,7 +366,7 @@ pub fn run() {
             let tray_icon_menu_for_event = tray_icon_menu.clone();
             TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Codex Capsule")
+                .tooltip("正在加载用量…")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
