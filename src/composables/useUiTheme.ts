@@ -4,7 +4,7 @@ export type UiTheme = "dark" | "light" | "system";
 
 function readTheme(): UiTheme {
   const value = localStorage.getItem("uiTheme");
-  return value === "light" || value === "system" ? value : "dark";
+  return value === "dark" || value === "light" ? value : "system";
 }
 
 export function useUiTheme(options: { syncAcrossWindows?: boolean; onChange?: () => void } = {}) {

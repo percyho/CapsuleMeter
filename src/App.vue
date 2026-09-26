@@ -99,8 +99,8 @@ let leftTimer: number | undefined;
 let rightTimer: number | undefined;
 
 // —— 可配置项（localStorage 持久化）——
-const opacity = ref(Number(localStorage.getItem("opacity") ?? "0.72"));
-const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "13"));
+const opacity = ref(Number(localStorage.getItem("opacity") ?? "1"));
+const fontSize = ref(Number(localStorage.getItem("fontSize") ?? "20"));
 type CapsuleColorValues = {
   background: string;
   leftFill: string;
@@ -887,14 +887,14 @@ function onContextMenu(e: MouseEvent) {
 
 // —— 恢复默认 ——
 function resetDefaults() {
-  opacity.value = 0.72;
-  fontSize.value = 13;
+  opacity.value = 1;
+  fontSize.value = 20;
   capsuleColors.background = "";
   capsuleColors.leftFill = "";
   capsuleColors.rightFill = "";
   capsuleThemeOptions.forEach(({ id }) => delete capsuleThemeColors[id]);
   capsuleStyle.value = "flat";
-  uiTheme.value = "dark";
+  uiTheme.value = "system";
   setLocale("zh-CN");
   alwaysOnTop.value = true;
   snapEnabled.value = true;
@@ -1907,7 +1907,7 @@ body {
 
 .capsule-pixel .num {
   font-family: Tiny5, Arial, "Microsoft YaHei", sans-serif;
-  font-size: calc(var(--num-size, 13px) * 1.08);
+  font-size: calc(var(--num-size, 20px) * 1.08);
   font-weight: 400;
   letter-spacing: 0;
   text-shadow: 1px 1px 0 rgba(14, 20, 33, 0.72);
@@ -2070,7 +2070,7 @@ body {
   place-items: center;
   width: 100%;
   box-sizing: border-box;
-  font-size: var(--num-size, 13px);
+  font-size: var(--num-size, 20px);
   font-weight: 750;
   color: #f8fafc;
   letter-spacing: -0.2px;
@@ -2095,7 +2095,7 @@ body {
 }
 
 .num.dim {
-  font-size: calc(var(--num-size, 13px) * 0.78);
+  font-size: calc(var(--num-size, 20px) * 0.78);
   font-weight: 600;
   color: rgba(248, 250, 252, 0.92);
   opacity: 1;
