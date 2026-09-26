@@ -74,9 +74,14 @@ pnpm build:patch   # Patch release: 1.0.1 → 1.0.2
 pnpm build:minor   # Minor release: 1.0.1 → 1.1.0
 pnpm build:major   # Major release: 1.0.1 → 2.0.0
 
+# Build with the current version (does not increment the version number)
+pnpm tauri build
+
 # Increment the version without building
 node scripts/bump-version.js patch   # Or minor / major
 ```
+
+`pnpm tauri build` uses the version already configured in `package.json` and `src-tauri/tauri.conf.json`; it does not automatically change either version.
 
 ## Release and Build Outputs
 
