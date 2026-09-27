@@ -29,7 +29,11 @@ type QuotaWindow = "fiveHour" | "weekly";
 type QuotaRange = 1 | 7 | 14 | 30;
 type TokenRange = 7 | 30 | 90 | 365 | 3650;
 
-const props = defineProps<{ historyPoints: HistoryPoint[]; uiTheme: "dark" | "light" | "system" }>();
+const props = defineProps<{
+  historyPoints: HistoryPoint[];
+  uiTheme: "dark" | "light" | "system";
+  historyOpening?: boolean;
+}>();
 const emit = defineEmits<{ openHistory: [] }>();
 
 const activeView = shallowRef<ViewTab>("quota");
@@ -226,7 +230,12 @@ onBeforeUnmount(() => {
         <button :class="{ active: activeView === 'quota' }" role="tab" :aria-selected="activeView === 'quota'" @click="activeView = 'quota'">{{ t("额度历史") }}</button>
         <button :class="{ active: activeView === 'tokens' }" role="tab" :aria-selected="activeView === 'tokens'" @click="activeView = 'tokens'">{{ t("Token 活动") }}</button>
       </div>
-      <button class="detail-button" @click="emit('openHistory')">{{ t("详细历史 ↗") }}</button>
+      <button
+        class="detail-button"
+        :disabled="props.historyOpening"
+        :aria-busy="props.historyOpening"
+        @click="emit('openHistory')"
+      >{{ t("详细历史 ↗") }}</button>
     </div>
 
     <template v-if="activeView === 'quota'">
@@ -275,6 +284,7 @@ onBeforeUnmount(() => {
 .view-tabs button, .segmented button { border: 0; border-radius: 7px; background: transparent; color: var(--panel-val, #8f97a8); cursor: pointer; font-size: 11px; padding: 6px 8px; white-space: nowrap; }
 .view-tabs button.active, .segmented button.active { color: var(--panel-text, #f4f6fb); background: var(--panel-control-active, rgba(255,255,255,0.1)); box-shadow: 0 1px 3px rgba(0,0,0,0.14); font-weight: 600; }
 .detail-button { border: 0; background: transparent; color: var(--panel-accent, #7d98f5); cursor: pointer; font-size: 11px; padding: 4px; }
+.detail-button:disabled { cursor: wait; opacity: .65; }
 .range-segmented button { padding-inline: 6px; }
 .token-ranges { max-width: 100%; overflow-x: auto; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }

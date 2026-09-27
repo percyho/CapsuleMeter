@@ -213,6 +213,8 @@ const resetShowSec = ref(Number(localStorage.getItem("resetShowSec") ?? "5"));
 const historyRetentionDays = ref(
   Number(localStorage.getItem("historyRetentionDays") ?? "30"),
 );
+const historyOpening = ref(false);
+let historyOpenCooldownTimer: number | null = null;
 const notificationsEnabled = ref(
   localStorage.getItem("notificationsEnabled") === "true",
 );
@@ -225,6 +227,21 @@ const trayIconMode = ref<TrayIconMode>(
   localStorage.getItem("trayIconMode") === "usage" ? "usage" : "logo",
 );
 const systemMessage = ref("");
+
+async function openHistory() {
+  if (historyOpening.value) return;
+  historyOpening.value = true;
+  try {
+    await invoke("open_history");
+  } catch (reason) {
+    systemMessage.value = `打开使用历史失败：${String(reason)}`;
+  } finally {
+    historyOpenCooldownTimer = window.setTimeout(() => {
+      historyOpening.value = false;
+      historyOpenCooldownTimer = null;
+    }, 650);
+  }
+}
 const autostart = ref(false);
 let unlistenEvents: UnlistenFn[] = [];
 
@@ -986,6 +1003,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (interval) window.clearInterval(interval);
+  if (historyOpenCooldownTimer !== null) {
+    window.clearTimeout(historyOpenCooldownTimer);
+  }
   clearTimer("left");
   clearTimer("right");
   unlistenEvents.forEach((unlisten) => unlisten());
@@ -1461,7 +1481,8 @@ onBeforeUnmount(() => {
           <StatsPanel
             :history-points="historyPoints"
             :ui-theme="uiTheme"
-            @open-history="invoke('open_history')"
+            :history-opening="historyOpening"
+            @open-history="openHistory"
           />
         </template>
 

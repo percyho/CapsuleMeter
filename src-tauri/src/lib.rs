@@ -120,23 +120,17 @@ async fn check_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
 }
 
 #[tauri::command]
-fn open_history(app: tauri::AppHandle) {
-    if let Some(w) = app.get_webview_window("history") {
-        let _ = w.show();
-        let _ = w.set_focus();
-        return;
-    }
-    use tauri::WebviewWindowBuilder;
-    let _ = WebviewWindowBuilder::new(
-        &app,
-        "history",
-        tauri::WebviewUrl::App("history.html".into()),
-    )
-    .title("使用历史")
-    .inner_size(920.0, 600.0)
-    .resizable(true)
-    .decorations(false)
-    .build();
+fn open_history(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("history")
+        .ok_or_else(|| "使用历史窗口未初始化，请重启应用后重试".to_string())?;
+    window
+        .show()
+        .map_err(|error| format!("显示使用历史窗口失败：{error}"))?;
+    window
+        .set_focus()
+        .map_err(|error| format!("聚焦使用历史窗口失败：{error}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -343,6 +337,15 @@ pub fn run() {
                 Emitter,
             };
             window_pos::restore(app.handle());
+            if let Some(history_window) = app.get_webview_window("history") {
+                let window_to_hide = history_window.clone();
+                history_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_to_hide.hide();
+                    }
+                });
+            }
             let show = MenuItem::with_id(app, "show", "显示胶囊", true, None::<&str>)?;
             let refresh = MenuItem::with_id(app, "refresh", "立即刷新", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
