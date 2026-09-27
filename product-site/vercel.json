@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/download.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/download",
+      "destination": "/api/download"
+    },
+    {
+      "source": "/",
+      "destination": "/CapsuleMeter产品介绍.html"
+    }
+  ]
+}
