@@ -33,6 +33,8 @@ const props = defineProps<{
   historyPoints: HistoryPoint[];
   uiTheme: "dark" | "light" | "system";
   historyOpening?: boolean;
+  usageLoading?: boolean;
+  usageError?: string;
 }>();
 const emit = defineEmits<{ openHistory: [] }>();
 
@@ -149,7 +151,8 @@ function renderChart() {
         name: t("剩余"),
         type: "line",
         data: points.map((point) => [point.time, point.value]),
-        showSymbol: false,
+        showSymbol: points.length === 1,
+        symbolSize: 7,
         smooth: 0.22,
         lineStyle: { color: "#0a84ff", width: 2 },
         areaStyle: { color: "rgba(10,132,255,0.16)" },
@@ -158,7 +161,15 @@ function renderChart() {
         type: "text",
         left: "center",
         top: "middle",
-        style: { text: t("还没有记录额度历史"), fill: textColor, fontSize: 11 },
+        style: {
+          text: props.usageLoading
+            ? t("正在加载额度历史…")
+            : props.usageError
+              ? t("额度数据不可用")
+              : t("还没有记录额度历史"),
+          fill: textColor,
+          fontSize: 11,
+        },
       }],
     }, { notMerge: true });
     return;
@@ -188,16 +199,31 @@ function renderChart() {
       barMaxWidth: 18,
       itemStyle: { color: "#0a84ff", borderRadius: [3, 3, 0, 0] },
     }] : [],
-    graphic: buckets.length || loading.value ? [] : [{
+    graphic: buckets.length ? [] : [{
       type: "text",
       left: "center",
       top: "middle",
-      style: { text: error.value || t("还没有记录 Token 活动"), fill: textColor, fontSize: 11 },
+      style: {
+        text: loading.value
+          ? t("正在加载 Token 活动…")
+          : error.value || t("还没有记录 Token 活动"),
+        fill: textColor,
+        fontSize: 11,
+      },
     }],
   }, { notMerge: true });
 }
 
-watch([activeView, quotaWindow, quotaRange, () => props.historyPoints, () => props.uiTheme, locale], async () => {
+watch([
+  activeView,
+  quotaWindow,
+  quotaRange,
+  () => props.historyPoints,
+  () => props.uiTheme,
+  () => props.usageLoading,
+  () => props.usageError,
+  locale,
+], async () => {
   await nextTick();
   scheduleRender();
 });
@@ -247,6 +273,8 @@ onBeforeUnmount(() => {
         <div class="segmented range-segmented" aria-label="额度范围">
           <button v-for="days in ([1, 7, 14, 30] as QuotaRange[])" :key="days" :class="{ active: quotaRange === days }" @click="quotaRange = days">{{ days === 1 ? t('当前') : (locale === 'en-US' ? `${days}d` : `${days}天`) }}</button>
         </div>
+        <span v-if="props.usageLoading" class="status-text">{{ t("额度历史加载中…") }}</span>
+        <span v-else-if="props.usageError && quotaPoints.length === 0" class="status-text error" :title="props.usageError">{{ t("额度数据不可用") }}</span>
       </div>
       <div class="metric-grid">
         <div class="metric"><strong>{{ quotaStats ? `${Math.round(quotaStats.current)}%` : '—' }}</strong><span>{{ t("当前剩余") }}</span></div>

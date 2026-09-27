@@ -432,6 +432,7 @@ const rightFillWidth = computed(() => {
 async function refresh() {
   if (loading.value) return;
   loading.value = true;
+  lastError.value = null;
   try {
     const data = await invoke<UsageData>("fetch_usage");
     usage.value = data;
@@ -500,6 +501,9 @@ function restartInterval() {
 watch(refreshMin, (value) => {
   localStorage.setItem("refreshMin", String(value));
   restartInterval();
+});
+watch(activeTab, (tab) => {
+  if (tab === "stats") void refresh();
 });
 
 // —— 外观 ——
@@ -1482,6 +1486,8 @@ onBeforeUnmount(() => {
             :history-points="historyPoints"
             :ui-theme="uiTheme"
             :history-opening="historyOpening"
+            :usage-loading="loading"
+            :usage-error="lastError ?? ''"
             @open-history="openHistory"
           />
         </template>

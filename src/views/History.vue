@@ -4,7 +4,9 @@ import { GraphicComponent, GridComponent, TooltipComponent } from "echarts/compo
 import { init, use, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { save } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from "vue";
 import WindowControls from "../components/common/WindowControls.vue";
 import { useUiTheme } from "../composables/useUiTheme";
@@ -29,6 +31,7 @@ const tokenRange = shallowRef<TokenRange>(30);
 const loading = shallowRef(false);
 const refreshing = shallowRef(false);
 const error = shallowRef("");
+const quotaError = shallowRef("");
 const actionMessage = shallowRef("");
 const daily = shallowRef<DailyUsage[]>([]);
 const { historyPoints, reloadHistory, appendUsage, clearHistory: clearStoredHistory } = useUsageHistory({
@@ -40,6 +43,7 @@ let chart: ECharts | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let renderTimer: ReturnType<typeof setTimeout> | null = null;
 let requestSequence = 0;
+let unlistenHistoryShown: UnlistenFn | null = null;
 const { toggleMaximizeWindow } = useWindowControls();
 useUiTheme({ syncAcrossWindows: true, onChange: () => scheduleRender(0) });
 
@@ -103,7 +107,7 @@ function renderChart() {
       xAxis: { type: "category", data: values.map(item => item.date?.slice(5) ?? ""), axisLine: { lineStyle: { color: grid } }, axisTick: { show: false }, axisLabel: { color: text, fontSize: 11, hideOverlap: true } },
       yAxis: { type: "value", axisLabel: { color: text, fontSize: 11, formatter: (value: number) => compactNumber(value) }, splitLine: { lineStyle: { color: grid } } },
       series: values.length ? [{ name: "Token", type: "bar", data: values.map(item => item.tokens ?? 0), barMaxWidth: 24, itemStyle: { color: "#0a84ff", borderRadius: [4,4,0,0] } }] : [],
-      graphic: values.length || loading.value ? [] : [emptyGraphic(error.value || "还没有记录 Token 活动", text)],
+      graphic: values.length ? [] : [emptyGraphic(loading.value ? "正在加载 Token 活动…" : error.value || "还没有记录 Token 活动", text)],
     }, { notMerge: true });
     return;
   }
@@ -112,26 +116,47 @@ function renderChart() {
     tooltip: { ...tooltip, formatter: (params: unknown) => { const item = (params as Array<{ value: [number, number] }>)[0]; return item ? `${new Date(item.value[0]).toLocaleString("zh-CN", { hour12: false })}<br/><strong>剩余 ${Math.round(item.value[1])}%</strong>` : ""; } },
     xAxis: { type: "time", axisLine: { lineStyle: { color: grid } }, axisTick: { show: false }, axisLabel: { color: text, fontSize: 11, hideOverlap: true }, splitLine: { show: false } },
     yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: text, fontSize: 11, formatter: "{value}%" }, splitLine: { lineStyle: { color: grid } } },
-    series: points.length ? [{ name: "剩余额度", type: "line", data: points.map(point => [point.time, point.value]), showSymbol: false, smooth: .22, lineStyle: { color: "#0a84ff", width: 2 }, areaStyle: { color: "rgba(10,132,255,.14)" } }] : [],
-    graphic: points.length ? [] : [emptyGraphic("当前范围还没有额度记录", text)],
+    series: points.length ? [{ name: "剩余额度", type: "line", data: points.map(point => [point.time, point.value]), showSymbol: points.length === 1, symbolSize: 7, smooth: .22, lineStyle: { color: "#0a84ff", width: 2 }, areaStyle: { color: "rgba(10,132,255,.14)" } }] : [],
+    graphic: points.length ? [] : [emptyGraphic(refreshing.value ? "正在加载额度历史…" : quotaError.value ? "额度数据不可用" : "当前范围还没有额度记录", text)],
   }, { notMerge: true });
 }
-async function refreshHistory() {
-  if (refreshing.value) return;
+async function refreshQuotaHistory(): Promise<boolean> {
+  if (refreshing.value) return false;
   refreshing.value = true;
-  actionMessage.value = "";
+  quotaError.value = "";
+  scheduleRender(0);
   try {
     const latest = await invoke<UsageData>("fetch_usage");
     if (latest.error) throw new Error(latest.error);
     appendUsage(latest);
-    await loadTokens();
     scheduleRender(0);
-    actionMessage.value = `已刷新：${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`;
+    return true;
   } catch (reason) {
     reloadHistory();
-    actionMessage.value = `刷新失败：${String(reason)}`;
+    quotaError.value = String(reason);
+    return false;
   } finally {
     refreshing.value = false;
+    await nextTick();
+    chart?.resize();
+    scheduleRender(0);
+  }
+}
+async function onHistoryWindowShown() {
+  await nextTick();
+  chart?.resize();
+  await Promise.all([refreshQuotaHistory(), loadTokens()]);
+}
+async function refreshHistory() {
+  if (refreshing.value) return;
+  if (loading.value) return;
+  actionMessage.value = "";
+  const refreshed = await refreshQuotaHistory();
+  await loadTokens();
+  if (refreshed) {
+    actionMessage.value = `已刷新：${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`;
+  } else {
+    actionMessage.value = `刷新失败：${quotaError.value}`;
   }
 }
 async function exportCsv() {
@@ -162,9 +187,12 @@ watch([quotaWindow, quotaRange], () => scheduleRender());
 watch(tokenRange, () => void loadTokens());
 onMounted(async () => {
   if (chartElement.value) { chart = init(chartElement.value); resizeObserver = new ResizeObserver(() => chart?.resize()); resizeObserver.observe(chartElement.value); }
-  renderChart(); await loadTokens();
+  renderChart();
+  unlistenHistoryShown = await listen("history-window-shown", () => void onHistoryWindowShown());
+  if (await getCurrentWindow().isVisible()) void onHistoryWindowShown();
+  await loadTokens();
 });
-onBeforeUnmount(() => { requestSequence += 1; if (renderTimer) clearTimeout(renderTimer); resizeObserver?.disconnect(); chart?.dispose(); chart = null; });
+onBeforeUnmount(() => { requestSequence += 1; unlistenHistoryShown?.(); if (renderTimer) clearTimeout(renderTimer); resizeObserver?.disconnect(); chart?.dispose(); chart = null; });
 </script>
 
 <template>
@@ -190,7 +218,10 @@ onBeforeUnmount(() => { requestSequence += 1; if (renderTimer) clearTimeout(rend
           </div>
         </template>
         <div v-else class="segmented token-range" aria-label="Token 活动范围"><button v-for="days in ([7,30,90,365,3650] as const)" :key="days" :class="{ active: tokenRange === days }" @click="tokenRange = days">{{ days === 3650 ? '全部' : days === 365 ? '1 年' : `${days} 天` }}</button></div>
-        <span v-if="error && tab === 'tokens'" class="state-badge warning" :title="error">Token 活动不可用</span>
+        <span v-if="refreshing && tab === 'quota'" class="state-badge">正在加载额度历史…</span>
+        <span v-else-if="quotaError && tab === 'quota'" class="state-badge warning" :title="quotaError">额度数据不可用</span>
+        <span v-if="loading && tab === 'tokens'" class="state-badge">正在加载 Token 活动…</span>
+        <span v-else-if="error && tab === 'tokens'" class="state-badge warning" :title="error">Token 活动不可用</span>
         <div class="topbar-actions">
           <button class="icon-button" :class="{ spinning: refreshing || loading }" :disabled="refreshing || loading" :title="loading ? '正在加载用量' : '获取最新用量'" :aria-label="loading ? '正在加载用量' : '获取最新用量'" @click="refreshHistory">↻</button>
           <button class="ghost" @click="exportCsv">导出 CSV</button><button class="ghost danger" @click="clearHistory">清除历史</button>

@@ -9,7 +9,7 @@ use std::{
         Arc,
     },
 };
-use tauri::{menu::MenuItem, Manager};
+use tauri::{menu::MenuItem, Emitter, Manager};
 
 #[derive(Clone)]
 struct TrayIconMenuState {
@@ -130,6 +130,7 @@ fn open_history(app: tauri::AppHandle) -> Result<(), String> {
     window
         .set_focus()
         .map_err(|error| format!("聚焦使用历史窗口失败：{error}"))?;
+    let _ = app.emit("history-window-shown", ());
     Ok(())
 }
 
