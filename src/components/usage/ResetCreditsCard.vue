@@ -26,6 +26,10 @@ const credits = computed(() =>
 const canUseFallback = computed(
   () => credits.value.length === 0 && (props.summary?.availableCount ?? 0) > 0,
 );
+const hasResetContent = computed(() => {
+  if (props.error || !props.summary) return true;
+  return credits.value.length > 0 || canUseFallback.value;
+});
 const countLabel = computed(() =>
   locale.value === "en-US"
     ? `${props.summary?.availableCount ?? 0} available`
@@ -71,7 +75,7 @@ function requestFallbackConsume() {
       </button>
     </div>
 
-    <div v-if="expanded" class="reset-content">
+    <div v-if="expanded && hasResetContent" class="reset-content">
       <p v-if="error" class="reset-message error" role="alert">{{ error }}</p>
       <p v-if="loading && !summary" class="reset-message">{{ t("加载中…") }}</p>
 
@@ -102,12 +106,6 @@ function requestFallbackConsume() {
         </p>
       </section>
 
-      <p
-        v-if="summary && !credits.length && !summary.availableCount"
-        class="reset-message"
-      >
-        {{ t("当前没有可用的限额重置机会") }}
-      </p>
       <p v-if="!summary && !loading && !error" class="reset-message">
         {{ t("重置机会列表尚未加载") }}
       </p>
