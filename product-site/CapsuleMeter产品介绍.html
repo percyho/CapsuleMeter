@@ -180,6 +180,7 @@
   .history-tab,.history-control{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:33px;border:1px solid transparent;border-radius:8px;padding:0 11px;background:transparent;color:#60718a;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
   .history-tab.is-active,.history-control.is-active{background:#fff;color:#18263b;box-shadow:0 1px 4px #172b451f;border-color:#e1e6ed}
   .history-tab:focus-visible{outline:2px solid #3787f7;outline-offset:2px}
+  .history-control:focus-visible{outline:2px solid #3787f7;outline-offset:2px}
   .history-tools{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;flex:1 1 560px}
   .history-tools>.history-filter-group{justify-self:start}
   .history-tools>.history-segment{grid-column:2;justify-self:center}
@@ -469,20 +470,20 @@
             <div class="history-tools" data-history-toolbar="quota">
               <div class="history-filter-group"><span class="history-tool-label" data-zh="额度窗口" data-en="Usage window">额度窗口</span><span class="history-control" data-zh="每周" data-en="Weekly">每周</span></div>
               <div class="history-segment" aria-label="额度历史范围">
-                <span class="history-control is-active" data-zh="当前周期" data-en="Current period">当前周期</span>
-                <span class="history-control" data-zh="最近 7 天" data-en="Last 7 days">最近 7 天</span>
-                <span class="history-control" data-zh="最近 14 天" data-en="Last 14 days">最近 14 天</span>
-                <span class="history-control" data-zh="最近一个月" data-en="Last month">最近一个月</span>
+                <button type="button" class="history-control is-active" data-quota-range="current" aria-pressed="true" data-zh="当前周期" data-en="Current period">当前周期</button>
+                <button type="button" class="history-control" data-quota-range="7d" aria-pressed="false" data-zh="最近 7 天" data-en="Last 7 days">最近 7 天</button>
+                <button type="button" class="history-control" data-quota-range="14d" aria-pressed="false" data-zh="最近 14 天" data-en="Last 14 days">最近 14 天</button>
+                <button type="button" class="history-control" data-quota-range="30d" aria-pressed="false" data-zh="最近一个月" data-en="Last month">最近一个月</button>
               </div>
               <div class="history-actions"><span class="history-control icon" aria-hidden="true">↻</span><span class="history-control" data-zh="导出 CSV" data-en="Export CSV">导出 CSV</span><span class="history-control danger" data-zh="清除历史" data-en="Clear history">清除历史</span></div>
             </div>
             <div class="history-tools" data-history-toolbar="tokens" hidden>
               <div class="history-segment" aria-label="Token 活动范围">
-                <span class="history-control" data-zh="7 天" data-en="7 days">7 天</span>
-                <span class="history-control is-active" data-zh="30 天" data-en="30 days">30 天</span>
-                <span class="history-control" data-zh="90 天" data-en="90 days">90 天</span>
-                <span class="history-control" data-zh="1 年" data-en="1 year">1 年</span>
-                <span class="history-control" data-zh="全部" data-en="All">全部</span>
+                <button type="button" class="history-control" data-token-range="7d" aria-pressed="false" data-zh="7 天" data-en="7 days">7 天</button>
+                <button type="button" class="history-control is-active" data-token-range="30d" aria-pressed="true" data-zh="30 天" data-en="30 days">30 天</button>
+                <button type="button" class="history-control" data-token-range="90d" aria-pressed="false" data-zh="90 天" data-en="90 days">90 天</button>
+                <button type="button" class="history-control" data-token-range="1y" aria-pressed="false" data-zh="1 年" data-en="1 year">1 年</button>
+                <button type="button" class="history-control" data-token-range="all" aria-pressed="false" data-zh="全部" data-en="All">全部</button>
               </div>
               <div class="history-actions"><span class="history-control icon" aria-hidden="true">↻</span><span class="history-control" data-zh="导出 CSV" data-en="Export CSV">导出 CSV</span><span class="history-control danger" data-zh="清除历史" data-en="Clear history">清除历史</span></div>
             </div>
@@ -490,30 +491,30 @@
 
           <section class="showcase-pane" id="history-quota-panel" role="tabpanel" aria-labelledby="history-quota-tab" data-pane="quota" data-history-panel="quota">
             <div class="history-kpis">
-              <div class="history-kpi"><strong>87%</strong><span data-zh="当前剩余" data-en="Current remaining">当前剩余</span></div>
-              <div class="history-kpi"><strong>87%</strong><span data-zh="最低剩余" data-en="Lowest remaining">最低剩余</span></div>
-              <div class="history-kpi"><strong>41</strong><span data-zh="采样点数" data-en="Data points">采样点数</span></div>
-              <div class="history-kpi"><strong>3.0h</strong><span data-zh="记录跨度" data-en="History span">记录跨度</span></div>
+              <div class="history-kpi"><strong data-quota-kpi="current">87%</strong><span data-zh="当前剩余" data-en="Current remaining">当前剩余</span></div>
+              <div class="history-kpi"><strong data-quota-kpi="lowest">86%</strong><span data-zh="最低剩余" data-en="Lowest remaining">最低剩余</span></div>
+              <div class="history-kpi"><strong data-quota-kpi="samples">41</strong><span data-zh="采样点数" data-en="Data points">采样点数</span></div>
+              <div class="history-kpi"><strong data-quota-kpi="span">3.0h</strong><span data-zh="记录跨度" data-en="History span">记录跨度</span></div>
             </div>
             <div class="history-chart-card">
               <div class="history-chart-head"><div><strong data-zh="每周剩余额度" data-en="Weekly remaining usage">每周剩余额度</strong><span data-zh="百分比越低，表示当前周期剩余额度越少" data-en="A lower percentage means less usage remains in this period">百分比越低，表示当前周期剩余额度越少</span></div><div class="history-legend"><i></i><span data-zh="剩余额度" data-en="Remaining usage">剩余额度</span></div></div>
               <svg class="history-chart" viewBox="0 0 960 340" role="img" aria-label="每周剩余额度折线图">
                 <line class="grid" x1="72" y1="34" x2="938" y2="34"/><line class="grid" x1="72" y1="84" x2="938" y2="84"/><line class="grid" x1="72" y1="134" x2="938" y2="134"/><line class="grid" x1="72" y1="184" x2="938" y2="184"/><line class="grid" x1="72" y1="234" x2="938" y2="234"/><line class="grid" x1="72" y1="284" x2="938" y2="284"/>
                 <text x="32" y="38">100%</text><text x="40" y="88">80%</text><text x="40" y="138">60%</text><text x="40" y="188">40%</text><text x="40" y="238">20%</text><text x="47" y="288">0%</text>
-                <path class="area" d="M72 59 L158 59 L172 61 L277 62 L405 64 L533 64 L670 65 L785 66 L938 68 L938 284 L72 284 Z"/>
-                <path class="line" d="M72 59 L158 59 L172 61 L277 62 L405 64 L533 64 L670 65 L785 66 L938 68"/>
-                <text x="180" y="316">09:00</text><text x="316" y="316">09:30</text><text x="452" y="316">10:00</text><text x="588" y="316">10:30</text><text x="724" y="316">11:00</text><text x="860" y="316">11:30</text>
+                <path class="area" data-quota-area d="M72 59 L158 59 L172 61 L277 62 L405 64 L533 64 L670 65 L785 66 L938 68 L938 284 L72 284 Z"/>
+                <path class="line" data-quota-line d="M72 59 L158 59 L172 61 L277 62 L405 64 L533 64 L670 65 L785 66 L938 68"/>
+                <text data-quota-tick="0" x="180" y="316">09:00</text><text data-quota-tick="1" x="316" y="316">09:30</text><text data-quota-tick="2" x="452" y="316">10:00</text><text data-quota-tick="3" x="588" y="316">10:30</text><text data-quota-tick="4" x="724" y="316">11:00</text><text data-quota-tick="5" x="860" y="316">11:30</text>
               </svg>
             </div>
-            <div class="history-footer"><span data-zh="本地记录，不上传数据" data-en="Stored locally. No data is uploaded.">本地记录，不上传数据</span><span data-zh="41 个额度采样点" data-en="41 usage samples">41 个额度采样点</span></div>
+            <div class="history-footer"><span data-zh="示例数据，仅用于界面演示" data-en="Sample data for display only">示例数据，仅用于界面演示</span><span data-quota-footer data-zh="41 个额度采样点" data-en="41 usage samples">41 个额度采样点</span></div>
           </section>
 
           <section class="showcase-pane" id="history-token-panel" role="tabpanel" aria-labelledby="history-token-tab" data-pane="tokens" data-history-panel="tokens" hidden>
             <div class="history-kpis">
-              <div class="history-kpi"><strong>522.6K</strong><span data-zh="本范围总量" data-en="Total in range">本范围总量</span></div>
-              <div class="history-kpi"><strong>28.4K</strong><span data-zh="本范围峰值" data-en="Peak in range">本范围峰值</span></div>
-              <div class="history-kpi"><strong>17.4K</strong><span data-zh="日均" data-en="Daily average">日均</span></div>
-              <div class="history-kpi"><strong>27</strong><span data-zh="活跃天数" data-en="Active days">活跃天数</span></div>
+              <div class="history-kpi"><strong data-token-kpi="total">522.6K</strong><span data-zh="本范围总量" data-en="Total in range">本范围总量</span></div>
+              <div class="history-kpi"><strong data-token-kpi="peak">28.4K</strong><span data-zh="本范围峰值" data-en="Peak in range">本范围峰值</span></div>
+              <div class="history-kpi"><strong data-token-kpi="average">17.4K</strong><span data-zh="日均" data-en="Daily average">日均</span></div>
+              <div class="history-kpi"><strong data-token-kpi="active">27</strong><span data-zh="活跃天数" data-en="Active days">活跃天数</span></div>
             </div>
             <div class="history-chart-card">
               <div class="history-chart-head"><div><strong data-zh="Token 使用趋势" data-en="Token usage trend">Token 使用趋势</strong><span data-zh="每日 Token 用量 · 示例数据" data-en="Daily token usage · Sample data">每日 Token 用量 · 示例数据</span></div><div class="history-legend"><i></i><span>Token</span></div></div>
@@ -522,46 +523,17 @@
                 <title id="token-chart-title">Daily Token activity, 30-day sample</title>
                 <line class="grid" x1="82" y1="34" x2="938" y2="34"/><line class="grid" x1="82" y1="117" x2="938" y2="117"/><line class="grid" x1="82" y1="200" x2="938" y2="200"/><line class="grid" x1="82" y1="284" x2="938" y2="284"/>
                 <text class="axis-label" x="66" y="38" text-anchor="end">30K</text><text class="axis-label" x="66" y="121" text-anchor="end">20K</text><text class="axis-label" x="66" y="204" text-anchor="end">10K</text><text class="axis-label" x="66" y="288" text-anchor="end">0</text>
-                <g class="token-bar"><title>2026-08-28 · 12.8K Tokens</title><rect x="88.0" y="177.3" width="16" height="106.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-08-29 · 18.4K Tokens</title><rect x="116.5" y="130.7" width="16" height="153.3" rx="3"/></g>
-                <g class="token-bar"><title>2026-08-30 · 0.0K Tokens</title><rect x="145.1" y="284.0" width="16" height="0.0" rx="3"/></g>
-                <g class="token-bar"><title>2026-08-31 · 21.7K Tokens</title><rect x="173.6" y="103.2" width="16" height="180.8" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-01 · 16.2K Tokens</title><rect x="202.1" y="149.0" width="16" height="135.0" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-02 · 23.5K Tokens</title><rect x="230.7" y="88.2" width="16" height="195.8" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-03 · 19.1K Tokens</title><rect x="259.2" y="124.8" width="16" height="159.2" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-04 · 14.8K Tokens</title><rect x="287.7" y="160.7" width="16" height="123.3" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-05 · 28.4K Tokens</title><rect x="316.3" y="47.3" width="16" height="236.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-06 · 17.6K Tokens</title><rect x="344.8" y="137.3" width="16" height="146.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-07 · 0.0K Tokens</title><rect x="373.3" y="284.0" width="16" height="0.0" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-08 · 22.1K Tokens</title><rect x="401.9" y="99.8" width="16" height="184.2" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-09 · 15.3K Tokens</title><rect x="430.4" y="156.5" width="16" height="127.5" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-10 · 19.8K Tokens</title><rect x="458.9" y="119.0" width="16" height="165.0" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-11 · 24.7K Tokens</title><rect x="487.5" y="78.2" width="16" height="205.8" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-12 · 18.9K Tokens</title><rect x="516.0" y="126.5" width="16" height="157.5" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-13 · 13.6K Tokens</title><rect x="544.5" y="170.7" width="16" height="113.3" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-14 · 21.4K Tokens</title><rect x="573.1" y="105.7" width="16" height="178.3" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-15 · 0.0K Tokens</title><rect x="601.6" y="284.0" width="16" height="0.0" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-16 · 26.2K Tokens</title><rect x="630.1" y="65.7" width="16" height="218.3" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-17 · 17.3K Tokens</title><rect x="658.7" y="139.8" width="16" height="144.2" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-18 · 20.6K Tokens</title><rect x="687.2" y="112.3" width="16" height="171.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-19 · 16.8K Tokens</title><rect x="715.7" y="144.0" width="16" height="140.0" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-20 · 23.1K Tokens</title><rect x="744.3" y="91.5" width="16" height="192.5" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-21 · 18.2K Tokens</title><rect x="772.8" y="132.3" width="16" height="151.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-22 · 11.9K Tokens</title><rect x="801.3" y="184.8" width="16" height="99.2" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-23 · 25.4K Tokens</title><rect x="829.9" y="72.3" width="16" height="211.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-24 · 14.6K Tokens</title><rect x="858.4" y="162.3" width="16" height="121.7" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-25 · 19.5K Tokens</title><rect x="886.9" y="121.5" width="16" height="162.5" rx="3"/></g>
-                <g class="token-bar"><title>2026-09-26 · 20.7K Tokens</title><rect x="915.5" y="111.5" width="16" height="172.5" rx="3"/></g>
-                <text class="axis-label" x="96.0" y="316" text-anchor="middle">08/28</text>
-                <text class="axis-label" x="267.2" y="316" text-anchor="middle">09/03</text>
-                <text class="axis-label" x="438.4" y="316" text-anchor="middle">09/09</text>
-                <text class="axis-label" x="609.6" y="316" text-anchor="middle">09/15</text>
-                <text class="axis-label" x="780.8" y="316" text-anchor="middle">09/21</text>
-                <text class="axis-label" x="923.5" y="316" text-anchor="middle">09/26</text>
+                <g data-token-bars></g>
+<text class="axis-label" data-token-tick="0" x="96.0" y="316" text-anchor="middle">08/28</text>
+                <text class="axis-label" data-token-tick="1" x="267.2" y="316" text-anchor="middle">09/03</text>
+                <text class="axis-label" data-token-tick="2" x="438.4" y="316" text-anchor="middle">09/09</text>
+                <text class="axis-label" data-token-tick="3" x="609.6" y="316" text-anchor="middle">09/15</text>
+                <text class="axis-label" data-token-tick="4" x="780.8" y="316" text-anchor="middle">09/21</text>
+                <text class="axis-label" data-token-tick="5" x="923.5" y="316" text-anchor="middle">09/26</text>
               </svg>
               </div>
             </div>
-            <div class="history-footer"><span data-zh="示例数据，仅用于界面演示" data-en="Sample data for display only">示例数据，仅用于界面演示</span><span data-zh="30 天 · 27 个活跃日" data-en="30 days · 27 active days">30 天 · 27 个活跃日</span></div>
+            <div class="history-footer"><span data-zh="示例数据，仅用于界面演示" data-en="Sample data for display only">示例数据，仅用于界面演示</span><span data-token-footer data-zh="30 天 · 27 个活跃日" data-en="30 days · 27 active days">30 天 · 27 个活跃日</span></div>
           </section>
         </div>
       </div>
@@ -622,7 +594,6 @@
 <section class="cta-band" id="download">
   <div class="wrap cta-box">
     <h2>把用量放进桌角，把注意力留给代码</h2>
-    <p>支持开机自启、系统托盘与动态双层用量环。当前版本 v1.1.0 · MIT 开源协议。</p>
     <div class="hero-ctas" style="justify-content:center">
       <a class="btn primary install-download" href="/download">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><g class="download-arrow"><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></g></svg>
@@ -677,7 +648,7 @@
         'body > section.sec:nth-of-type(6) .sec-head .kicker':'USAGE SPEED','body > section.sec:nth-of-type(6) .sec-head h2':'Colored dots show how quickly usage is changing','body > section.sec:nth-of-type(6) .sec-head p':'The dots on either side of the capsule correspond to the 5-hour and weekly limits. Their colors reflect recent usage speed; hover for an estimate.',
         '.sp.gray b':'Gray','.sp.gray span':'Evaluating · Not enough data','.sp.green b':'Green','.sp.green span':'Steady usage','.sp.blue b':'Blue','.sp.blue span':'Normal usage','.sp.orange b':'Orange','.sp.orange span':'Fast usage','.sp.red b':'Red','.sp.red span':'Very fast usage',
         '#privacy h3':'Privacy commitment','#privacy .priv li:nth-child(1)':'<b>Tokens stay on your device</b> — Access, refresh, and ID tokens are used only by the local Rust backend. They are never exposed to the frontend or third parties.','#privacy .priv li:nth-child(2)':'<b>Only the account email is shown</b> — The email is read locally from the ID token. No other sensitive information is displayed.','#privacy .priv li:nth-child(3)':'<b>History stays on your device</b> — Usage samples are stored locally. Export them or clear them at any time.',
-        '#download h2':'Keep usage in the corner and focus on your code','#download p':'Supports launch at startup, the system tray, and a live dual-window usage display. Version v1.1.0 · MIT licensed.','#download .btn.primary span':'Download for Windows','#download .btn.ghost span':'View source · GitHub',
+        '#download h2':'Keep usage in the corner and focus on your code','#download .btn.primary span':'Download for Windows','#download .btn.ghost span':'View source · GitHub',
         '.foot-links a:nth-child(1)':'Features','.foot-links a:nth-child(2)':'History','.foot-links a:nth-child(3)':'Themes','.foot-links a:nth-child(4)':'Privacy','footer .foot-in > span':'© 2026 Capsule Meter · Windows x64'
       }
     };
@@ -685,6 +656,7 @@
     Object.keys(translations.en).forEach(function(selector){var el=document.querySelector(selector);if(el)original.set(selector,el.innerHTML);});
     function applyHistoryDemoLanguage(next){
       document.querySelectorAll('#history-demo [data-zh][data-en]').forEach(function(el){el.textContent=next==='en'?el.getAttribute('data-en'):el.getAttribute('data-zh');});
+      if(window.capsuleRefreshHistoryDemoLanguage)window.capsuleRefreshHistoryDemoLanguage();
       var tabs=document.querySelector('#history-demo [role="tablist"]');
       if(tabs)tabs.setAttribute('aria-label',next==='en'?'Usage history view':'用量历史类型');
       var rangeGroups=document.querySelectorAll('#history-demo .history-segment');
@@ -716,6 +688,97 @@
     var tabs=Array.from(document.querySelectorAll('#history-demo [data-history-tab]'));
     var panels=Array.from(document.querySelectorAll('#history-demo [data-history-panel]'));
     var toolbars=Array.from(document.querySelectorAll('#history-demo [data-history-toolbar]'));
+    var quotaRangeButtons=Array.from(document.querySelectorAll('#history-demo [data-quota-range]'));
+    var tokenRangeButtons=Array.from(document.querySelectorAll('#history-demo [data-token-range]'));
+    var selectedQuotaRange='current',selectedTokenRange='30d';
+    var quotaConfigs={
+      current:{days:0,samples:41,span:'3.0h',start:90,end:87,wobble:0.8},
+      '7d':{days:7,samples:56,span:'7d',start:96,end:76,wobble:4.2},
+      '14d':{days:14,samples:112,span:'14d',start:97,end:68,wobble:5.2},
+      '30d':{days:30,samples:240,span:'30d',start:96,end:51,wobble:7.4}
+    };
+    function updateQuotaDemo(range){
+      var config=quotaConfigs[range];if(!config)return;
+      selectedQuotaRange=range;
+      var lang=window.capsuleSiteLanguage?window.capsuleSiteLanguage():'zh';
+      quotaRangeButtons.forEach(function(button){var active=button.getAttribute('data-quota-range')===range;button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',active?'true':'false');});
+      var points=range==='current'?41:31,values=[];
+      for(var i=0;i<points;i++){
+        var t=i/(points-1),value=config.start+(config.end-config.start)*t+Math.sin(i*1.71)*config.wobble+Math.sin(i*.47)*config.wobble*.48;
+        values.push(Math.max(0,Math.min(100,value)));
+      }
+      values[points-1]=config.end;
+      if(range==='current')values[Math.floor(points*.58)]=86;
+      var lowest=Math.min.apply(null,values),current=Math.round(values[values.length-1]);
+      document.querySelector('[data-quota-kpi="current"]').textContent=current+'%';
+      document.querySelector('[data-quota-kpi="lowest"]').textContent=Math.round(lowest)+'%';
+      document.querySelector('[data-quota-kpi="samples"]').textContent=String(config.samples);
+      document.querySelector('[data-quota-kpi="span"]').textContent=config.span;
+      var linePoints=values.map(function(value,index){return (72+866*index/(points-1)).toFixed(1)+' '+(284-value*2.5).toFixed(1);});
+      var linePath='M'+linePoints.join(' L'),areaPath=linePath+' L938 284 L72 284 Z';
+      document.querySelector('[data-quota-line]').setAttribute('d',linePath);
+      document.querySelector('[data-quota-area]').setAttribute('d',areaPath);
+      var ticks=Array.from(document.querySelectorAll('[data-quota-tick]'));
+      var today=new Date(),startDate=new Date(today);
+      if(config.days)startDate.setDate(today.getDate()-config.days+1);
+      ticks.forEach(function(tick,index){
+        var progress=index/(ticks.length-1),label;
+        if(!config.days){var minutes=9*60+progress*150;label=String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(Math.floor(minutes%60)).padStart(2,'0');}
+        else{var date=new Date(startDate);date.setDate(startDate.getDate()+Math.round(config.days*progress));label=lang==='en'?String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'):(date.getMonth()+1)+'/'+date.getDate();}
+        tick.textContent=label;
+      });
+      document.querySelector('[data-quota-footer]').textContent=lang==='en'?config.samples+' usage samples':config.samples+' 个额度采样点';
+    }
+    quotaRangeButtons.forEach(function(button){button.addEventListener('click',function(){updateQuotaDemo(button.getAttribute('data-quota-range'));});});
+    var tokenConfigs={
+      '7d':{days:7,seed:17,average:12.8,labelZh:'7 天',labelEn:'7-day'},
+      '30d':{days:30,seed:31,average:17.4,labelZh:'30 天',labelEn:'30-day'},
+      '90d':{days:90,seed:53,average:18.1,labelZh:'90 天',labelEn:'90-day'},
+      '1y':{days:365,seed:79,average:16.8,labelZh:'1 年',labelEn:'1-year'},
+      all:{days:540,seed:97,average:15.9,labelZh:'全部',labelEn:'all-time'}
+    };
+    function formatTokenCount(value){return (value/1000).toFixed(1)+'K';}
+    function updateTokenDemo(range){
+      var config=tokenConfigs[range];if(!config)return;
+      selectedTokenRange=range;
+      var lang=window.capsuleSiteLanguage?window.capsuleSiteLanguage():'zh';
+      tokenRangeButtons.forEach(function(button){var active=button.getAttribute('data-token-range')===range;button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',active?'true':'false');});
+      var today=new Date(),startDate=new Date(today);startDate.setDate(today.getDate()-config.days+1);
+      var rows=[],random=config.seed;
+      for(var i=0;i<config.days;i++){
+        random=(random*48271)%2147483647;
+        var date=new Date(startDate);date.setDate(startDate.getDate()+i);
+        var active=(i+config.seed)%11!==0;
+        var raw=active?10000+(random%19000):0;
+        rows.push({date:date,value:raw});
+      }
+      var rawTotal=rows.reduce(function(sum,row){return sum+row.value;},0),scale=config.average*1000*rows.length/rawTotal;
+      rows.forEach(function(row){row.value=Math.min(29900,Math.round(row.value*scale));});
+      var total=rows.reduce(function(sum,row){return sum+row.value;},0),peak=Math.max.apply(null,rows.map(function(row){return row.value;})),activeDays=rows.filter(function(row){return row.value>0;}).length;
+      document.querySelector('[data-token-kpi="total"]').textContent=formatTokenCount(total);
+      document.querySelector('[data-token-kpi="peak"]').textContent=formatTokenCount(peak);
+      document.querySelector('[data-token-kpi="average"]').textContent=formatTokenCount(total/rows.length);
+      document.querySelector('[data-token-kpi="active"]').textContent=String(activeDays);
+      var bars=document.querySelector('[data-token-bars]'),svgNs='http://www.w3.org/2000/svg',step=856/rows.length,barWidth=Math.max(1,Math.min(16,step*.68));
+      bars.replaceChildren();
+      rows.forEach(function(row,index){
+        var group=document.createElementNS(svgNs,'g');group.setAttribute('class','token-bar');
+        var title=document.createElementNS(svgNs,'title'),dateIso=row.date.getFullYear()+'-'+String(row.date.getMonth()+1).padStart(2,'0')+'-'+String(row.date.getDate()).padStart(2,'0');title.textContent=dateIso+' · '+formatTokenCount(row.value)+' Tokens';
+        var rect=document.createElementNS(svgNs,'rect'),height=row.value/30000*250,x=82+index*step+(step-barWidth)/2;
+        rect.setAttribute('x',x.toFixed(2));rect.setAttribute('y',(284-height).toFixed(2));rect.setAttribute('width',barWidth.toFixed(2));rect.setAttribute('height',height.toFixed(2));rect.setAttribute('rx',Math.min(3,barWidth/2).toFixed(1));
+        group.append(title,rect);bars.appendChild(group);
+      });
+      var ticks=Array.from(document.querySelectorAll('[data-token-tick]'));
+      ticks.forEach(function(tick,index){
+        var rowIndex=Math.round(index/(ticks.length-1)*(rows.length-1)),date=rows[rowIndex].date;
+        tick.textContent=String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0');
+      });
+      var period=lang==='en'?config.labelEn:config.labelZh;
+      document.querySelector('[data-token-footer]').textContent=lang==='en'?period+' · '+activeDays+' active days':period+' · '+activeDays+' 个活跃日';
+      document.getElementById('token-chart-title').textContent='Daily Token activity, '+config.labelEn+' sample';
+    }
+    tokenRangeButtons.forEach(function(button){button.addEventListener('click',function(){updateTokenDemo(button.getAttribute('data-token-range'));});});
+    window.capsuleRefreshHistoryDemoLanguage=function(){updateQuotaDemo(selectedQuotaRange);updateTokenDemo(selectedTokenRange);};
     function selectHistoryView(view){
       tabs.forEach(function(tab){var selected=tab.getAttribute('data-history-tab')===view;tab.classList.toggle('is-active',selected);tab.setAttribute('aria-selected',selected?'true':'false');});
       panels.forEach(function(panel){var selected=panel.getAttribute('data-history-panel')===view;panel.hidden=!selected;panel.setAttribute('aria-hidden',selected?'false':'true');});
@@ -730,6 +793,8 @@
         next.focus();next.click();
       });
     });
+    updateQuotaDemo(selectedQuotaRange);
+    updateTokenDemo(selectedTokenRange);
     selectHistoryView('quota');
   })();
 
@@ -903,8 +968,8 @@
   // 本地 file:// 预览没有站点的 /download Edge Function，改为查询并下载最新 Windows 安装包。
   if(window.location.protocol==='file:'){
     var localDownloadLinks=document.querySelectorAll('a[href="/download"]');
-    var releaseApi='https://api.github.com/repos/percyho/codexc-apsule/releases/latest';
-    var releasePage='https://github.com/percyho/codexc-apsule/releases/latest';
+    var releaseApi='https://api.github.com/repos/percyho/CapsuleMeter/releases/latest';
+    var releasePage='https://github.com/percyho/CapsuleMeter/releases/latest';
     var resolvingDownload=false;
     localDownloadLinks.forEach(function(link){
       link.addEventListener('click',async function(event){
@@ -918,7 +983,7 @@
           var installer=(release.assets||[]).find(function(asset){return asset.name&&asset.name.toLowerCase().endsWith('_x64-setup.exe')&&asset.browser_download_url;});
           if(!installer)throw new Error('No Windows installer in the latest release');
           var downloadUrl=new URL(installer.browser_download_url);
-          if(downloadUrl.protocol!=='https:'||downloadUrl.hostname!=='github.com'||!downloadUrl.pathname.startsWith('/percyho/codexc-apsule/releases/download/'))throw new Error('Unexpected installer URL');
+          if(downloadUrl.protocol!=='https:'||downloadUrl.hostname!=='github.com'||!downloadUrl.pathname.startsWith('/percyho/CapsuleMeter/releases/download/'))throw new Error('Unexpected installer URL');
           window.location.assign(downloadUrl.href);
         }catch(_){
           window.location.assign(releasePage);

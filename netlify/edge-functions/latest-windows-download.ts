@@ -1,8 +1,8 @@
 import type { Config } from "@netlify/edge-functions";
 
-const RELEASE_API = "https://api.github.com/repos/percyho/codexc-apsule/releases/latest";
-const RELEASE_PAGE = "https://github.com/percyho/codexc-apsule/releases/latest";
-const RELEASE_ASSET_PREFIX = "/percyho/codexc-apsule/releases/download/";
+const RELEASE_API = "https://api.github.com/repos/percyho/CapsuleMeter/releases/latest";
+const RELEASE_PAGE = "https://github.com/percyho/CapsuleMeter/releases/latest";
+const RELEASE_ASSET_PREFIX = "/percyho/CapsuleMeter/releases/download/";
 
 type GitHubRelease = {
   assets?: Array<{
