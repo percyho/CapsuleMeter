@@ -315,6 +315,7 @@ pub fn run() {
         .manage(window_pos::WindowPosState(Default::default()))
         .manage(window_pos::SnapState {
             last_move: Default::default(),
+            suppress_until: Default::default(),
         })
         .manage(window_pos::SnapEnabled(Default::default()))
         .invoke_handler(tauri::generate_handler![
@@ -323,6 +324,7 @@ pub fn run() {
             reset_credits::fetch_reset_credits,
             reset_credits::consume_reset_credit,
             window_pos::set_snap_enabled,
+            window_pos::suppress_snap_after_programmatic_move,
             open_history,
             write_history_csv,
             start_codex_login,

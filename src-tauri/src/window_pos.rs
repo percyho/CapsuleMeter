@@ -10,6 +10,7 @@ pub struct WindowPosState(pub Mutex<Option<PhysicalPosition<i32>>>);
 /// 贴边吸附状态：记录最后一次窗口移动时间，用于拖动结束后的吸附检测
 pub struct SnapState {
     pub last_move: Arc<Mutex<Option<Instant>>>,
+    pub suppress_until: Arc<Mutex<Option<Instant>>>,
 }
 
 /// 贴边吸附功能开关（由设置面板控制）
@@ -20,6 +21,14 @@ pub struct SnapEnabled(pub Mutex<bool>);
 pub fn set_snap_enabled(state: tauri::State<SnapEnabled>, enabled: bool) {
     if let Ok(mut inner) = state.0.lock() {
         *inner = enabled;
+    }
+}
+
+/// Suppress edge snapping briefly after programmatic window repositioning.
+#[tauri::command]
+pub fn suppress_snap_after_programmatic_move(state: tauri::State<SnapState>) {
+    if let Ok(mut until) = state.suppress_until.lock() {
+        *until = Some(Instant::now() + Duration::from_millis(800));
     }
 }
 
@@ -158,6 +167,17 @@ pub fn on_event(app: &AppHandle, event: RunEvent) {
                 if let Ok(mut last) = snap.last_move.lock() {
                     *last = Some(Instant::now());
                 }
+                let is_suppressed = snap
+                    .suppress_until
+                    .lock()
+                    .map(|until| match *until {
+                        Some(deadline) => Instant::now() < deadline,
+                        None => false,
+                    })
+                    .unwrap_or(false);
+                if is_suppressed {
+                    return;
+                }
             }
             let app2 = app.clone();
             std::thread::spawn(move || {
@@ -177,6 +197,21 @@ pub fn on_event(app: &AppHandle, event: RunEvent) {
                         None => false,
                     };
                     if idle {
+                        let programmatic = app2
+                            .try_state::<SnapState>()
+                            .map(|s| {
+                                s.suppress_until
+                                    .lock()
+                                    .map(|until| match *until {
+                                        Some(deadline) => Instant::now() < deadline,
+                                        None => false,
+                                    })
+                                    .unwrap_or(false)
+                            })
+                            .unwrap_or(false);
+                        if programmatic {
+                            break;
+                        }
                         // 仅在吸附开关打开时执行贴边吸附
                         let snap_on = app2
                             .try_state::<SnapEnabled>()

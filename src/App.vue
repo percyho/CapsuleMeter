@@ -917,6 +917,7 @@ function onPanelResizeEnd() {
 
 const panelAlignRight = ref(false);
 let panelGeometryChanging = false;
+let lastContextMenuAt = 0;
 
 async function togglePanel() {
   if (panelGeometryChanging) return;
@@ -932,6 +933,9 @@ async function togglePanel() {
       const targetX = shouldAlignRight
         ? winX - (panelW.value - CAPSULE_WIDTH)
         : winX;
+      if (targetX !== winX) {
+        await invoke("suppress_snap_after_programmatic_move");
+      }
       await Promise.all([
         win.setSize(new LogicalSize(panelW.value, CAPSULE_HEIGHT + panelH.value)),
         win.setPosition(new LogicalPosition(targetX, winY)),
@@ -943,6 +947,9 @@ async function togglePanel() {
       const targetX = panelAlignRight.value
         ? winX + (panelW.value - CAPSULE_WIDTH)
         : winX;
+      if (targetX !== winX) {
+        await invoke("suppress_snap_after_programmatic_move");
+      }
       await Promise.all([
         win.setSize(new LogicalSize(CAPSULE_WIDTH, CAPSULE_HEIGHT)),
         win.setPosition(new LogicalPosition(targetX, winY)),
@@ -958,6 +965,9 @@ async function togglePanel() {
 function onContextMenu(e: MouseEvent) {
   e.preventDefault();
   e.stopPropagation();
+  const now = Date.now();
+  if (now - lastContextMenuAt < 350) return;
+  lastContextMenuAt = now;
   togglePanel();
 }
 
