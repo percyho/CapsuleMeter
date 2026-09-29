@@ -120,12 +120,14 @@ function renderChart() {
   if (!chart) return;
   const styles = chartContainer.value ? getComputedStyle(chartContainer.value) : null;
   const textColor = styles?.getPropertyValue("--panel-val").trim() || "#8991a3";
+  const fontFamily = styles?.fontFamily || "sans-serif";
+  const axisLabel = { color: textColor, fontFamily, fontSize: 11 };
   const gridColor = "rgba(135, 145, 165, 0.14)";
   const tooltip = {
     trigger: "axis",
     backgroundColor: "rgba(26, 29, 38, 0.96)",
     borderColor: "rgba(255,255,255,0.12)",
-    textStyle: { color: "#eef1f7", fontSize: 11 },
+    textStyle: { color: "#eef1f7", fontFamily, fontSize: 12 },
   };
 
   if (activeView.value === "quota") {
@@ -137,14 +139,14 @@ function renderChart() {
       xAxis: {
         type: "time",
         axisLine: { lineStyle: { color: gridColor } },
-        axisLabel: { color: textColor, fontSize: 9 },
+        axisLabel,
         splitLine: { show: false },
       },
       yAxis: {
         type: "value",
         min: 0,
         max: 100,
-        axisLabel: { color: textColor, fontSize: 9, formatter: "{value}%" },
+        axisLabel: { ...axisLabel, formatter: "{value}%" },
         splitLine: { lineStyle: { color: gridColor } },
       },
       series: points.length ? [{
@@ -168,7 +170,8 @@ function renderChart() {
               ? t("额度数据不可用")
               : t("还没有记录额度历史"),
           fill: textColor,
-          fontSize: 11,
+          fontFamily,
+          fontSize: 12,
         },
       }],
     }, { notMerge: true });
@@ -184,12 +187,12 @@ function renderChart() {
       type: "category",
       data: buckets.map((item) => item.date?.slice(5) ?? ""),
       axisLine: { lineStyle: { color: gridColor } },
-      axisLabel: { color: textColor, fontSize: 9, hideOverlap: true },
+      axisLabel: { ...axisLabel, hideOverlap: true },
       splitLine: { show: false },
     },
     yAxis: {
       type: "value",
-      axisLabel: { color: textColor, fontSize: 9, formatter: (value: number) => compactNumber(value) },
+      axisLabel: { ...axisLabel, formatter: (value: number) => compactNumber(value) },
       splitLine: { lineStyle: { color: gridColor } },
     },
     series: buckets.length ? [{
@@ -208,7 +211,8 @@ function renderChart() {
           ? t("正在加载 Token 活动…")
           : error.value || t("还没有记录 Token 活动"),
         fill: textColor,
-        fontSize: 11,
+        fontFamily,
+        fontSize: 12,
       },
     }],
   }, { notMerge: true });

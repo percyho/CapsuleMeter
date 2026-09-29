@@ -1960,7 +1960,15 @@ body,
 }
 
 body {
-  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    system-ui,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -2486,7 +2494,7 @@ body {
 }
 
 .mac-settings-window .panel-description {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mac-settings-window .panel-account {
@@ -3762,5 +3770,155 @@ html[data-ui-theme="light"] .panel.mac-settings-window :disabled {
   html[data-ui-theme="light"] .panel.mac-settings-window select {
     transition-duration: 0.01ms;
   }
+}
+
+/* Use macOS system typography and a restrained, readable size scale in the
+   native settings window. Keep display typography in capsule previews intact. */
+.mac-settings-window {
+  --mac-font-small: 11px;
+  --mac-font-control: 12px;
+  --mac-font-body: 13px;
+  --mac-font-heading: 17px;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Segoe UI",
+    "Microsoft YaHei",
+    system-ui,
+    sans-serif;
+  font-size: var(--mac-font-body);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.mac-settings-window :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+.mac-settings-window .panel-title {
+  font-size: var(--mac-font-heading);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.18px;
+}
+
+.mac-settings-window .panel-sub,
+.mac-settings-window .panel-account-name {
+  font-size: var(--mac-font-small);
+  line-height: 1.35;
+}
+
+.mac-settings-window .tab,
+.mac-settings-window .row,
+.mac-settings-window .row-name {
+  font-size: var(--mac-font-body);
+}
+
+.mac-settings-window .group-label {
+  font-size: var(--mac-font-control);
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.mac-settings-window .row-val,
+.mac-settings-window .seg button,
+.mac-settings-window .shortcut-input,
+.mac-settings-window select,
+.mac-settings-window .btn-mini,
+.mac-settings-window .color-reset,
+.mac-settings-window .system-message,
+.mac-settings-window .privacy-summary,
+.mac-settings-window .chart-hint {
+  font-size: var(--mac-font-control);
+}
+
+.mac-settings-window .panel-sub {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.mac-settings-window .panel-account-name,
+.mac-settings-window .privacy-list li,
+.mac-settings-window .chart-axis {
+  font-size: var(--mac-font-small);
+}
+
+.mac-settings-window .seg button {
+  line-height: 1.25;
+}
+
+.mac-settings-window .btn-mini {
+  min-height: 32px;
+  padding: 6px 11px;
+}
+
+.mac-settings-window .theme-heading h2 {
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.mac-settings-window .theme-heading p,
+.mac-settings-window .theme-copy small,
+.mac-settings-window .reset-message,
+.mac-settings-window .reset-fallback-copy span,
+.mac-settings-window .reset-description,
+.mac-settings-window .privacy-note {
+  font-size: var(--mac-font-control);
+  line-height: 1.45;
+}
+
+.mac-settings-window .theme-count,
+.mac-settings-window .reset-badge,
+.mac-settings-window .reset-status,
+.mac-settings-window .reset-item-meta,
+.mac-settings-window .reset-warning,
+.mac-settings-window .status-text {
+  font-family: inherit;
+  font-size: var(--mac-font-small);
+  line-height: 1.35;
+}
+
+.mac-settings-window .theme-count {
+  font-weight: 600;
+}
+
+.mac-settings-window .kpi-lbl,
+.mac-settings-window .privacy-badge {
+  font-size: var(--mac-font-small);
+}
+
+.mac-settings-window .theme-copy strong,
+.mac-settings-window .reset-fallback-copy strong,
+.mac-settings-window .reset-item-title strong {
+  font-size: var(--mac-font-body);
+}
+
+.mac-settings-window .reset-use,
+.mac-settings-window .view-tabs button,
+.mac-settings-window .segmented button,
+.mac-settings-window .detail-button {
+  font-family: inherit;
+  font-size: var(--mac-font-control);
+}
+
+.mac-settings-window .metric strong {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mac-settings-window .metric span {
+  font-size: var(--mac-font-small);
+}
+
+.mac-settings-window .privacy-note,
+.mac-settings-window .status-text {
+  line-height: 1.4;
 }
 </style>
