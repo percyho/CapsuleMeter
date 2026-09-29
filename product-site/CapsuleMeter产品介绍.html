@@ -189,13 +189,23 @@
   .history-control:focus-visible{outline:2px solid #3787f7;outline-offset:2px}
   .history-tools{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;flex:1 1 560px}
   .history-tools>.history-filter-group{justify-self:start}
+  .history-tools[data-history-toolbar="quota"]>.history-filter-group{justify-self:end}
   .history-tools>.history-segment{grid-column:2;justify-self:center}
   .history-tools>.history-actions{grid-column:3;justify-self:end}
   .history-tools[data-history-toolbar="tokens"]>.history-segment{grid-column:2}
   .history-filter-group,.history-segment,.history-actions{display:flex;align-items:center}
   .history-filter-group{gap:7px}
   .history-filter-group .history-control{gap:7px}
-  .history-filter-group .history-control::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-1px) rotate(45deg);flex:none}
+  .history-window-picker{position:relative;display:flex;align-items:center}
+  .history-window-picker .history-window-label{border-radius:8px 0 0 8px;cursor:default}
+  .history-window-trigger{width:27px;min-width:27px;padding:0;border-left:0;border-radius:0 8px 8px 0}
+  .history-window-trigger::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-1px) rotate(45deg);flex:none}
+  .history-window-menu{position:absolute;z-index:20;top:calc(100% + 5px);right:0;min-width:112px;padding:4px;border:1px solid #dfe5ed;border-radius:9px;background:#fff;box-shadow:0 8px 20px #172b4526}
+  .history-window-menu[hidden]{display:none}
+  .history-window-option{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:32px;padding:0 9px;border:0;border-radius:6px;background:transparent;color:#526780;font:inherit;font-size:12px;font-weight:600;text-align:left;white-space:nowrap;cursor:pointer}
+  .history-window-option:hover,.history-window-option:focus-visible{background:#edf3fa;outline:none}
+  .history-window-option[aria-checked="true"]{color:#18263b;background:#edf3fa}
+  .history-window-option[aria-checked="true"]::after{content:"✓";margin-left:12px;color:#3787f7}
   .history-tool-label{font-size:11px;font-weight:600;color:#71819a;white-space:nowrap}
   .history-segment{gap:2px;padding:3px;border:1px solid #dce3ec;border-radius:10px;background:#e4eaf1}
   .history-segment .history-control{min-height:29px;padding:0 10px;border-color:transparent;background:transparent}
@@ -479,7 +489,7 @@
               <button type="button" class="history-tab" id="history-token-tab" role="tab" aria-selected="false" aria-controls="history-token-panel" data-history-tab="tokens" data-zh="Token 活动" data-en="Token activity">Token 活动</button>
             </div>
             <div class="history-tools" data-history-toolbar="quota">
-              <div class="history-filter-group"><span class="history-tool-label" data-zh="额度窗口" data-en="Usage window">额度窗口</span><span class="history-control" data-zh="每周" data-en="Weekly">每周</span></div>
+              <div class="history-filter-group"><span class="history-tool-label" data-zh="额度窗口" data-en="Usage window">额度窗口</span><div class="history-window-picker"><span class="history-control history-window-label" data-quota-window-label data-zh="每周" data-en="Weekly">每周</span><button type="button" class="history-control history-window-trigger" data-quota-window-toggle aria-haspopup="menu" aria-expanded="false" aria-controls="quota-window-menu" aria-label="选择额度窗口" title="选择额度窗口"></button><div class="history-window-menu" id="quota-window-menu" role="menu" aria-label="额度窗口" hidden><button type="button" class="history-window-option" role="menuitemradio" data-quota-window="5h" aria-checked="false" data-zh="5 小时" data-en="5 hours">5 小时</button><button type="button" class="history-window-option" role="menuitemradio" data-quota-window="weekly" aria-checked="true" data-zh="每周" data-en="Weekly">每周</button></div></div></div>
               <div class="history-segment" aria-label="额度历史范围">
                 <button type="button" class="history-control is-active" data-quota-range="current" aria-pressed="true" data-zh="当前周期" data-en="Current period">当前周期</button>
                 <button type="button" class="history-control" data-quota-range="7d" aria-pressed="false" data-zh="最近 7 天" data-en="Last 7 days">最近 7 天</button>
@@ -704,50 +714,90 @@
     var panels=Array.from(document.querySelectorAll('#history-demo [data-history-panel]'));
     var toolbars=Array.from(document.querySelectorAll('#history-demo [data-history-toolbar]'));
     var quotaRangeButtons=Array.from(document.querySelectorAll('#history-demo [data-quota-range]'));
+    var quotaWindowLabel=document.querySelector('#history-demo [data-quota-window-label]');
+    var quotaWindowToggle=document.querySelector('#history-demo [data-quota-window-toggle]');
+    var quotaWindowPicker=document.querySelector('#history-demo .history-window-picker');
+    var quotaWindowMenu=document.querySelector('#quota-window-menu');
+    var quotaWindowOptions=Array.from(document.querySelectorAll('#history-demo [data-quota-window]'));
     var tokenRangeButtons=Array.from(document.querySelectorAll('#history-demo [data-token-range]'));
     var selectedQuotaRange='current';
+    var selectedQuotaWindow='weekly';
     var selectedTokenRange='30d';
+    var quotaWindowProfiles={
+      '5h':{labelZh:'5 小时',labelEn:'5 hours',titleZh:'5 小时剩余额度',titleEn:'5-hour remaining usage',current:{days:0,span:'3.0h',start:90,end:87,wobble:.5},startOffset:-2,endOffset:-1,wobbleMultiplier:.8},
+      weekly:{labelZh:'每周',labelEn:'Weekly',titleZh:'每周剩余额度',titleEn:'Weekly remaining usage',current:{days:7,span:'7d',start:100,end:87,wobble:2.5},startOffset:0,endOffset:0,wobbleMultiplier:1}
+    };
     var quotaConfigs={
-      current:{days:0,samples:41,span:'3.0h',start:90,end:87,wobble:0.3,titleZh:'每周剩余额度',titleEn:'Weekly remaining usage'},
-      '7d':{days:7,samples:56,span:'7d',start:96,end:76,wobble:4.2,titleZh:'最近 7 天剩余额度',titleEn:'Last 7 days remaining usage'},
-      '14d':{days:14,samples:112,span:'14d',start:97,end:68,wobble:5.2,titleZh:'最近 14 天剩余额度',titleEn:'Last 14 days remaining usage'},
-      '30d':{days:30,samples:240,span:'30d',start:96,end:51,wobble:7.4,titleZh:'最近一个月剩余额度',titleEn:'Last month remaining usage'}
+      current:{days:0,samples:41,span:'3.0h',start:90,end:87,wobble:0.3},
+      '7d':{days:7,samples:56,span:'7d',start:96,end:76,wobble:4.2},
+      '14d':{days:14,samples:112,span:'14d',start:97,end:68,wobble:5.2},
+      '30d':{days:30,samples:240,span:'30d',start:96,end:51,wobble:7.4}
     };
     function updateQuotaDemo(range){
       var config=quotaConfigs[range];if(!config)return;
       selectedQuotaRange=range;
       var lang=window.capsuleSiteLanguage?window.capsuleSiteLanguage():'zh';
+      var profile=quotaWindowProfiles[selectedQuotaWindow];
+      quotaWindowLabel.textContent=lang==='en'?profile.labelEn:profile.labelZh;
+      quotaWindowToggle.setAttribute('aria-label',lang==='en'?'Choose usage window, currently '+profile.labelEn:'选择额度窗口，当前'+profile.labelZh);
+      quotaWindowToggle.title=lang==='en'?'Choose usage window, currently '+profile.labelEn:'选择额度窗口，当前'+profile.labelZh;
+      quotaWindowMenu.setAttribute('aria-label',lang==='en'?'Usage window':'额度窗口');
+      quotaWindowOptions.forEach(function(option){option.setAttribute('aria-checked',option.getAttribute('data-quota-window')===selectedQuotaWindow?'true':'false');});
       quotaRangeButtons.forEach(function(button){var active=button.getAttribute('data-quota-range')===range;button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',active?'true':'false');});
+      var days=range==='current'?profile.current.days:config.days;
+      var span=range==='current'?profile.current.span:config.span;
+      var start=range==='current'?profile.current.start:config.start+profile.startOffset;
+      var end=range==='current'?profile.current.end:config.end+profile.endOffset;
+      var wobble=range==='current'?profile.current.wobble:config.wobble*profile.wobbleMultiplier;
       var points=config.samples,values=[];
       for(var i=0;i<points;i++){
-        var t=i/(points-1),value=config.start+(config.end-config.start)*t+Math.sin(i*1.71)*config.wobble+Math.sin(i*.47)*config.wobble*.48;
+        var t=i/(points-1),value=start+(end-start)*t+Math.sin(i*1.71)*wobble+Math.sin(i*.47)*wobble*.48;
         values.push(Math.max(0,Math.min(100,value)));
       }
-      values[points-1]=config.end;
+      values[points-1]=end;
       var lowest=Math.min.apply(null,values),current=Math.round(values[values.length-1]);
       document.querySelector('[data-quota-kpi="current"]').textContent=current+'%';
       document.querySelector('[data-quota-kpi="lowest"]').textContent=Math.round(lowest)+'%';
       document.querySelector('[data-quota-kpi="samples"]').textContent=String(config.samples);
-      document.querySelector('[data-quota-kpi="span"]').textContent=config.span;
+      document.querySelector('[data-quota-kpi="span"]').textContent=span;
       var linePoints=values.map(function(value,index){return (72+866*index/(points-1)).toFixed(1)+' '+(284-value*2.5).toFixed(1);});
       var linePath='M'+linePoints.join(' L');
       document.querySelector('[data-quota-line]').setAttribute('d',linePath);
       document.querySelector('[data-quota-area]').setAttribute('d',linePath+' L938 284 L72 284 Z');
       var ticks=Array.from(document.querySelectorAll('[data-quota-tick]'));
       var today=new Date();today.setHours(12,0,0,0);
-      var startDate=new Date(today);if(config.days)startDate.setDate(today.getDate()-config.days+1);
+      var startDate=new Date(today);if(days)startDate.setDate(today.getDate()-days+1);
       ticks.forEach(function(tick,index){
         var progress=index/(ticks.length-1),label;
-        if(!config.days){var minutes=9*60+progress*150;label=String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(Math.floor(minutes%60)).padStart(2,'0');}
-        else{var date=new Date(startDate);date.setDate(startDate.getDate()+Math.round((config.days-1)*progress));label=lang==='en'?String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'):(date.getMonth()+1)+'/'+date.getDate();}
+        if(!days){var minutes=9*60+progress*150;label=String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(Math.floor(minutes%60)).padStart(2,'0');}
+        else{var date=new Date(startDate);date.setDate(startDate.getDate()+Math.round((days-1)*progress));label=lang==='en'?String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'):(date.getMonth()+1)+'/'+date.getDate();}
         tick.textContent=label;
       });
       var title=document.querySelector('[data-quota-title]');
-      title.textContent=lang==='en'?config.titleEn:config.titleZh;
-      document.querySelector('#history-quota-panel .history-chart').setAttribute('aria-label',(lang==='en'?config.titleEn:config.titleZh)+(lang==='en'?' chart':'折线图'));
+      var rangeLabel=range==='current'?'':(lang==='en'?document.querySelector('[data-quota-range="'+range+'"]').getAttribute('data-en'):document.querySelector('[data-quota-range="'+range+'"]').getAttribute('data-zh')+' · ');
+      var chartTitle=lang==='en'?(range==='current'?profile.titleEn:rangeLabel+' · '+profile.titleEn):(range==='current'?profile.titleZh:rangeLabel+profile.titleZh);
+      title.textContent=chartTitle;
+      document.querySelector('#history-quota-panel .history-chart').setAttribute('aria-label',chartTitle+(lang==='en'?' chart':'折线图'));
       document.querySelector('[data-quota-footer]').textContent=lang==='en'?config.samples+' usage samples':config.samples+' 个额度采样点';
     }
     quotaRangeButtons.forEach(function(button){button.addEventListener('click',function(){updateQuotaDemo(button.getAttribute('data-quota-range'));});});
+    function setQuotaWindowMenuOpen(open,focusSelected){
+      quotaWindowMenu.hidden=!open;
+      quotaWindowToggle.setAttribute('aria-expanded',open?'true':'false');
+      if(open&&focusSelected){var selected=quotaWindowOptions.find(function(option){return option.getAttribute('data-quota-window')===selectedQuotaWindow;});if(selected)selected.focus();}
+    }
+    quotaWindowToggle.addEventListener('click',function(){setQuotaWindowMenuOpen(quotaWindowMenu.hidden,true);});
+    quotaWindowOptions.forEach(function(option){option.addEventListener('click',function(){selectedQuotaWindow=option.getAttribute('data-quota-window');updateQuotaDemo(selectedQuotaRange);setQuotaWindowMenuOpen(false,false);quotaWindowToggle.focus();});});
+    quotaWindowPicker.addEventListener('keydown',function(event){
+      if(event.key==='Escape'&&!quotaWindowMenu.hidden){event.preventDefault();setQuotaWindowMenuOpen(false,false);quotaWindowToggle.focus();return;}
+      if((event.key==='ArrowDown'||event.key==='ArrowUp')&&event.target===quotaWindowToggle){event.preventDefault();setQuotaWindowMenuOpen(true,true);return;}
+      if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+        var index=quotaWindowOptions.indexOf(event.target);if(index<0)return;
+        event.preventDefault();quotaWindowOptions[(index+(event.key==='ArrowDown'?1:quotaWindowOptions.length-1))%quotaWindowOptions.length].focus();
+      }
+    });
+    quotaWindowPicker.addEventListener('focusout',function(event){if(!quotaWindowPicker.contains(event.relatedTarget))setQuotaWindowMenuOpen(false,false);});
+    document.addEventListener('click',function(event){if(!quotaWindowPicker.contains(event.target))setQuotaWindowMenuOpen(false,false);});
     window.capsuleRefreshQuotaDemoLanguage=function(){updateQuotaDemo(selectedQuotaRange);};
     var tokenConfigs={
       '7d':{days:7,seed:17,average:12.8,labelZh:'7 天',labelEn:'7-day'},
