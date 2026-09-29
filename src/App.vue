@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { show as showApp } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   getCurrentWindow,
   LogicalSize,
@@ -45,6 +45,8 @@ import {
 const DRAG_THRESHOLD = 4;
 const CAPSULE_WIDTH = 140;
 const CAPSULE_HEIGHT = 34;
+const currentWindow = getCurrentWindow();
+const isCapsuleWidget = currentWindow.label === "capsule-widget";
 const isMacOS = ref(false);
 const platformReady = ref(false);
 let dragTracking: { sx: number; sy: number; started: boolean } | null = null;
@@ -112,6 +114,15 @@ type CapsuleColorValues = {
 type CapsuleThemeColorOverrides = Partial<
   Record<CapsuleTheme, CapsuleColorValues>
 >;
+type CapsuleWidgetSettings = {
+  capsuleStyle: CapsuleTheme;
+  capsuleColors: CapsuleColorValues;
+  capsuleThemeColors: CapsuleThemeColorOverrides;
+  displayMode: string;
+  showUsageValues: boolean;
+  fontSize: number;
+  opacity: number;
+};
 
 const storedCapsuleStyle = localStorage.getItem("capsuleStyle");
 const capsuleStyle = ref<CapsuleTheme>(parseCapsuleTheme(storedCapsuleStyle));
@@ -176,6 +187,21 @@ const capsuleColors = reactive<CapsuleColorValues>({
     rightFill: "",
   }),
 });
+
+function syncCapsuleWidgetSettings() {
+  if (isCapsuleWidget) return;
+  const settings: CapsuleWidgetSettings = {
+    capsuleStyle: capsuleStyle.value,
+    capsuleColors: { ...capsuleColors },
+    capsuleThemeColors: JSON.parse(JSON.stringify(capsuleThemeColors)),
+    displayMode: displayMode.value,
+    showUsageValues: showUsageValues.value,
+    fontSize: fontSize.value,
+    opacity: opacity.value,
+  };
+  void emit("capsule-widget-settings", settings).catch(() => {});
+}
+
 const capsuleBackgroundStyle = computed(() =>
   capsuleColors.background
     ? { backgroundColor: capsuleColors.background, backgroundImage: "none" }
@@ -226,13 +252,15 @@ const notificationThreshold = ref(
 );
 const capsuleVisible = ref(localStorage.getItem("capsuleVisible") !== "false");
 type TrayIconMode = "logo" | "usage";
-const trayIconMode = ref<TrayIconMode>(
-  localStorage.getItem("trayIconMode") === "usage" ? "usage" : "logo",
-);
+const storedTrayIconMode = localStorage.getItem("trayIconMode");
+const trayIconMode = ref<TrayIconMode>(storedTrayIconMode === "usage" ? "usage" : "logo");
+if (storedTrayIconMode === "capsule") {
+  localStorage.setItem("trayIconMode", "logo");
+}
 const systemMessage = ref("");
 
 async function showCapsuleWindow() {
-  const win = getCurrentWindow();
+  const win = currentWindow;
   try {
     // A hidden menu-bar app must be activated as well as its window on macOS.
     // Other platforms do not expose an app-level show operation.
@@ -252,6 +280,44 @@ async function showCapsuleWindow() {
     }
   } catch (reason) {
     systemMessage.value = `显示胶囊失败：${String(reason)}`;
+  }
+}
+
+async function setMacCapsuleWidgetVisible(visible: boolean) {
+  if (!isMacOS.value || isCapsuleWidget) return;
+  try {
+    let x: number | null = null;
+    let y: number | null = null;
+    if (visible) {
+      const savedPosition = localStorage.getItem("capsuleWidgetPosition");
+      if (savedPosition) {
+        try {
+          const position = JSON.parse(savedPosition) as { x?: number; y?: number };
+          if (Number.isFinite(position.x) && Number.isFinite(position.y)) {
+            x = position.x as number;
+            y = position.y as number;
+          }
+        } catch {
+          localStorage.removeItem("capsuleWidgetPosition");
+        }
+      }
+      await showApp();
+    }
+    await invoke("set_capsule_widget_visible", { visible, x, y });
+    capsuleVisible.value = visible;
+    localStorage.setItem("capsuleVisible", String(visible));
+    localStorage.setItem("capsuleWidgetVisible", String(visible));
+  } catch (reason) {
+    systemMessage.value = `显示桌面小工具失败：${String(reason)}`;
+  }
+}
+
+async function openSettingsWindow() {
+  try {
+    await showApp();
+    await invoke("show_settings_window");
+  } catch (reason) {
+    systemMessage.value = `打开设置失败：${String(reason)}`;
   }
 }
 
@@ -494,14 +560,17 @@ async function refresh() {
       : result;
     usage.value = data;
     lastError.value = data.error ?? null;
+    if (!isCapsuleWidget) {
+      await updateTrayIcon(data);
+      void emit("usage-data-updated", data);
+    }
     if (data.error) {
       scheduleRefreshRetry();
     } else {
       refreshFailureCount = 0;
       lastSuccessfulRefreshAt = Date.now();
-      await maybeNotifyLowUsage(data);
+      if (!isCapsuleWidget) await maybeNotifyLowUsage(data);
     }
-    await updateTrayIcon(data);
   } catch (e) {
     lastError.value = String(e);
     const emptyWindow: WindowData = {
@@ -521,9 +590,11 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
-  lastRefresh.value = new Date().toLocaleTimeString("zh-CN", { hour12: false });
-  recordHistory();
-  void refreshResetCredits();
+  if (!isCapsuleWidget) {
+    lastRefresh.value = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    recordHistory();
+    void refreshResetCredits();
+  }
   if (refreshQueued) {
     refreshQueued = false;
     window.setTimeout(() => void refresh(), 0);
@@ -599,10 +670,11 @@ function applyWindowSettings() {
 }
 
 async function updateTrayIcon(data = usage.value) {
-  if (!data) return;
+  if (!data || isCapsuleWidget) return;
+  const mode = trayIconMode.value;
   try {
     await invoke("update_tray_icon", {
-      mode: trayIconMode.value,
+      mode,
       fiveHour: data.five_hour.remaining_percent,
       weekly: data.weekly.remaining_percent,
       fiveHourResetAfterSeconds: data.five_hour.reset_after_seconds,
@@ -746,10 +818,12 @@ function onTabKeydown(event: KeyboardEvent) {
 function onOpacityChange() {
   localStorage.setItem("opacity", String(opacity.value));
   applyWindowSettings();
+  syncCapsuleWidgetSettings();
 }
 function onFontSizeChange() {
   localStorage.setItem("fontSize", String(fontSize.value));
   applyWindowSettings();
+  syncCapsuleWidgetSettings();
 }
 
 function onCapsuleColorChange(
@@ -760,6 +834,8 @@ function onCapsuleColorChange(
   capsuleColors[color] = event.target.value;
   capsuleThemeColors[capsuleStyle.value] = { ...capsuleColors };
   localStorage.setItem("capsuleThemeColors", JSON.stringify(capsuleThemeColors));
+  syncCapsuleWidgetSettings();
+  void updateTrayIcon();
 }
 
 function resetCapsuleColors() {
@@ -770,6 +846,8 @@ function resetCapsuleColors() {
   localStorage.setItem("capsuleThemeColors", JSON.stringify(capsuleThemeColors));
   ["capsuleBackgroundColor", "capsuleLeftFillColor", "capsuleRightFillColor"]
     .forEach((key) => localStorage.removeItem(key));
+  syncCapsuleWidgetSettings();
+  void updateTrayIcon();
 }
 
 function setCapsuleStyle(style: CapsuleTheme) {
@@ -779,13 +857,15 @@ function setCapsuleStyle(style: CapsuleTheme) {
   capsuleColors.background = colors?.background ?? "";
   capsuleColors.leftFill = colors?.leftFill ?? "";
   capsuleColors.rightFill = colors?.rightFill ?? "";
+  syncCapsuleWidgetSettings();
+  void updateTrayIcon();
 }
 
 // —— 行为 ——
 async function applyAlwaysOnTop() {
   try {
-    await getCurrentWindow().setAlwaysOnTop(
-      isMacOS.value ? false : alwaysOnTop.value,
+    await currentWindow.setAlwaysOnTop(
+      isCapsuleWidget || (!isMacOS.value && alwaysOnTop.value),
     );
   } catch {}
 }
@@ -805,13 +885,20 @@ function onSnapChange() {
 }
 
 async function setCapsuleVisibility(visible: boolean) {
+  capsuleVisible.value = visible;
+  localStorage.setItem(
+    isMacOS.value ? "capsuleWidgetVisible" : "capsuleVisible",
+    String(visible),
+  );
+  if (isMacOS.value && !isCapsuleWidget) {
+    await setMacCapsuleWidgetVisible(visible);
+    return;
+  }
   if (visible) {
     await showCapsuleWindow();
     return;
   }
-  capsuleVisible.value = visible;
-  localStorage.setItem("capsuleVisible", String(visible));
-  const win = getCurrentWindow();
+  const win = currentWindow;
   await win.hide();
 }
 
@@ -821,11 +908,13 @@ function onCapsuleVisibilityChange() {
 
 function onDisplayModeChange() {
   localStorage.setItem("displayMode", displayMode.value);
+  syncCapsuleWidgetSettings();
 }
 
 function onShowUsageValuesChange() {
   showUsageValues.value = !showUsageValues.value;
   localStorage.setItem("showUsageValues", String(showUsageValues.value));
+  syncCapsuleWidgetSettings();
 }
 
 function onResetShowSecChange() {
@@ -986,7 +1075,11 @@ async function togglePanel() {
 function onContextMenu(e: MouseEvent) {
   e.preventDefault();
   e.stopPropagation();
-  togglePanel();
+  if (isCapsuleWidget) {
+    void openSettingsWindow();
+  } else {
+    togglePanel();
+  }
 }
 
 // —— 恢复默认 ——
@@ -1033,11 +1126,14 @@ function resetDefaults() {
     "notificationsEnabled",
     "notificationThreshold",
     "capsuleVisible",
+    "capsuleWidgetVisible",
+    "capsuleWidgetPosition",
     "trayIconMode",
     "panelW",
     "panelH",
   ].forEach((k) => localStorage.removeItem(k));
   applyWindowSettings();
+  syncCapsuleWidgetSettings();
   applyAlwaysOnTop();
   applySnap();
   restartInterval();
@@ -1064,21 +1160,69 @@ onMounted(async () => {
   } catch {
     isMacOS.value = /Mac/i.test(`${navigator.platform} ${navigator.userAgent}`);
   }
-  showPanel.value = isMacOS.value;
+  if (isMacOS.value) {
+    const widgetPreferenceVersion = localStorage.getItem(
+      "capsuleWidgetPreferenceVersion",
+    );
+    if (widgetPreferenceVersion !== "1") {
+      capsuleVisible.value = true;
+      localStorage.setItem("capsuleWidgetVisible", "true");
+      localStorage.setItem("capsuleWidgetPreferenceVersion", "1");
+    } else {
+      const widgetPreference = localStorage.getItem("capsuleWidgetVisible");
+      capsuleVisible.value = widgetPreference !== "false";
+    }
+  }
+  if (isCapsuleWidget && !isMacOS.value) {
+    await currentWindow.hide();
+    return;
+  }
+  showPanel.value = isMacOS.value && !isCapsuleWidget;
   platformReady.value = true;
   applyWindowSettings();
+  syncCapsuleWidgetSettings();
   applyAlwaysOnTop();
   applySnap();
-  initAutostart();
   refresh();
+
+  if (isCapsuleWidget) {
+    if (!isMacOS.value || !capsuleVisible.value) void currentWindow.hide();
+    void listen<UsageData>("usage-data-updated", ({ payload }) => {
+      usage.value = payload;
+      lastError.value = payload.error ?? null;
+    }).then((unlisten) => unlistenEvents.push(unlisten));
+    void listen<CapsuleWidgetSettings>("capsule-widget-settings", ({ payload }) => {
+      capsuleStyle.value = payload.capsuleStyle;
+      Object.assign(capsuleColors, payload.capsuleColors);
+      Object.assign(capsuleThemeColors, payload.capsuleThemeColors);
+      displayMode.value = payload.displayMode;
+      showUsageValues.value = payload.showUsageValues;
+      fontSize.value = payload.fontSize;
+      opacity.value = payload.opacity;
+      applyWindowSettings();
+    }).then((unlisten) => unlistenEvents.push(unlisten));
+    void listen<boolean>("capsule-widget-state", ({ payload }) => {
+      capsuleVisible.value = payload;
+      localStorage.setItem("capsuleVisible", String(payload));
+      localStorage.setItem("capsuleWidgetVisible", String(payload));
+    }).then((unlisten) => unlistenEvents.push(unlisten));
+    void currentWindow.onMoved(({ payload }) => {
+      localStorage.setItem("capsuleWidgetPosition", JSON.stringify(payload));
+    }).then((unlisten) => unlistenEvents.push(unlisten));
+    return;
+  }
+
+  initAutostart();
   restartInterval();
   window.addEventListener("online", refreshIfStale);
   document.addEventListener("visibilitychange", refreshIfStale);
   void applyGlobalShortcut().catch((reason) => {
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   });
-  if (!isMacOS.value && !capsuleVisible.value) {
-    void getCurrentWindow().hide();
+  if (isMacOS.value) {
+    void setMacCapsuleWidgetVisible(capsuleVisible.value);
+  } else if (!capsuleVisible.value) {
+    void currentWindow.hide();
   }
   void listen("tray-refresh", () => void refresh()).then((unlisten) =>
     unlistenEvents.push(unlisten),
@@ -1091,6 +1235,11 @@ onMounted(async () => {
       await showCapsuleWindow();
       if (!showPanel.value) await togglePanel();
     })();
+  }).then((unlisten) => unlistenEvents.push(unlisten));
+  void listen<boolean>("capsule-widget-state", ({ payload }) => {
+    capsuleVisible.value = payload;
+    localStorage.setItem("capsuleVisible", String(payload));
+    localStorage.setItem("capsuleWidgetVisible", String(payload));
   }).then((unlisten) => unlistenEvents.push(unlisten));
   void listen<TrayIconMode>("tray-icon-mode-change", ({ payload }) => {
     onTrayIconModeChange(payload);
@@ -1118,9 +1267,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    v-if="platformReady && !isMacOS"
+    v-if="platformReady && (!isMacOS || isCapsuleWidget)"
     class="capsule-shell"
-    :class="{ 'capsule-shell-right': panelAlignRight }"
+    :class="{
+      'capsule-shell-right': panelAlignRight,
+      'capsule-widget-shell': isCapsuleWidget,
+    }"
     :style="speedIndicatorStyle"
     @mousedown="onCapsuleMouseDown"
     @contextmenu="onContextMenu"
@@ -1171,7 +1323,7 @@ onBeforeUnmount(() => {
   </div>
 
   <div
-    v-if="platformReady && (isMacOS || showPanel)"
+    v-if="platformReady && !isCapsuleWidget && (isMacOS || showPanel)"
     class="panel"
     :class="{ 'align-right': !isMacOS && panelAlignRight, 'mac-settings-window': isMacOS }"
     :style="isMacOS ? { width: '100%', height: '100%' } : { width: panelW + 'px', height: panelH + 'px' }"
@@ -1192,25 +1344,6 @@ onBeforeUnmount(() => {
           :title="usage.account"
           >{{ usage.account }}</span
         >
-      </div>
-      <div v-if="isMacOS" class="mac-icon-picker">
-        <span class="mac-icon-label">菜单栏图标</span>
-        <div class="seg" aria-label="菜单栏图标样式">
-          <button
-            :class="{ on: trayIconMode === 'logo' }"
-            :aria-pressed="trayIconMode === 'logo'"
-            @click="onTrayIconModeChange('logo')"
-          >
-            Logo
-          </button>
-          <button
-            :class="{ on: trayIconMode === 'usage' }"
-            :aria-pressed="trayIconMode === 'usage'"
-            @click="onTrayIconModeChange('usage')"
-          >
-            {{ t("用量环") }}
-          </button>
-        </div>
       </div>
       <button
         v-if="!isMacOS"
@@ -1398,6 +1531,25 @@ onBeforeUnmount(() => {
                 @click="setLocale('en-US')"
               >
                 English
+              </button>
+            </div>
+          </div>
+          <div v-if="isMacOS" class="row">
+            <span class="row-name">{{ t("菜单栏图标") }}</span>
+            <div class="seg" :aria-label="t('菜单栏图标')">
+              <button
+                :class="{ on: trayIconMode === 'logo' }"
+                :aria-pressed="trayIconMode === 'logo'"
+                @click="onTrayIconModeChange('logo')"
+              >
+                Logo
+              </button>
+              <button
+                :class="{ on: trayIconMode === 'usage' }"
+                :aria-pressed="trayIconMode === 'usage'"
+                @click="onTrayIconModeChange('usage')"
+              >
+                {{ t("用量环") }}
               </button>
             </div>
           </div>
@@ -1626,8 +1778,8 @@ onBeforeUnmount(() => {
 
         <template v-if="activeTab === 'system'">
           <div class="group-label">{{ t("系统") }}</div>
-          <div v-if="!isMacOS" class="row row-flat">
-            <span class="row-name">{{ t("显示胶囊") }}</span>
+          <div class="row row-flat">
+            <span class="row-name">{{ isMacOS ? t("桌面小工具") : t("显示胶囊") }}</span>
             <button
               class="switch"
               :class="{ on: capsuleVisible }"
@@ -1651,15 +1803,17 @@ onBeforeUnmount(() => {
           </div>
           <div v-if="!isMacOS" class="row row-flat">
             <span class="row-name">{{ t("托盘图标") }}</span>
-            <div class="seg" aria-label="托盘图标样式">
-              <button
-                :class="{ on: trayIconMode === 'logo' }"
-                @click="onTrayIconModeChange('logo')"
+          <div class="seg" aria-label="托盘图标样式">
+            <button
+              :class="{ on: trayIconMode === 'logo' }"
+              :aria-pressed="trayIconMode === 'logo'"
+              @click="onTrayIconModeChange('logo')"
               >
                 Logo
               </button>
               <button
                 :class="{ on: trayIconMode === 'usage' }"
+                :aria-pressed="trayIconMode === 'usage'"
                 @click="onTrayIconModeChange('usage')"
               >
                 {{ t("用量环") }}
@@ -1839,6 +1993,10 @@ body {
   place-items: center;
   width: 140px;
   height: 34px;
+}
+
+.capsule-widget-shell {
+  margin: 5px 0;
 }
 
 .capsule::before {
@@ -2334,19 +2492,6 @@ body {
 .mac-settings-window .panel-account {
   flex: 1 1 auto;
   padding-right: 10px;
-}
-
-.mac-icon-picker {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.mac-icon-label {
-  color: var(--panel-val);
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 .mac-settings-window .settings-shell {
@@ -3125,5 +3270,497 @@ html[data-ui-theme="light"] .resize-handle {
     transparent 50%,
     rgba(20, 28, 42, 0.2) 50%
   );
+}
+
+/* macOS settings controls use layered translucent surfaces to match the
+   native frosted-glass window material. */
+html[data-ui-theme="light"] .panel.mac-settings-window {
+  --panel-control-bg: rgba(255, 255, 255, 0.28);
+  --panel-control-active: rgba(255, 255, 255, 0.68);
+  --panel-control-border: rgba(255, 255, 255, 0.68);
+  --panel-secondary-text: #344563;
+  --panel-secondary-border: rgba(255, 255, 255, 0.72);
+  --panel-secondary-bg: rgba(255, 255, 255, 0.3);
+  --panel-secondary-hover-text: #172d52;
+  --panel-secondary-hover-border: rgba(255, 255, 255, 0.92);
+  --panel-secondary-hover: rgba(255, 255, 255, 0.58);
+  --panel-danger-text: #a33d45;
+  --panel-danger-border: rgba(206, 86, 99, 0.28);
+  --panel-danger-bg: rgba(255, 232, 235, 0.4);
+  --panel-danger-hover: rgba(255, 218, 223, 0.68);
+  --panel-danger-hover-text: #8e2834;
+  --panel-danger-hover-border: rgba(206, 86, 99, 0.46);
+  --panel-danger-active: rgba(255, 204, 211, 0.76);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .panel-head,
+html[data-ui-theme="light"] .panel.mac-settings-window .tabs,
+html[data-ui-theme="light"] .panel.mac-settings-window .panel-foot {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.34),
+    rgba(255, 255, 255, 0.14)
+  );
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .row {
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 13px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.2)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 6px 16px rgba(44, 67, 106, 0.07);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .row.row-flat {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .row:not(.row-flat):hover {
+  border-color: rgba(255, 255, 255, 0.82);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.56),
+    rgba(255, 255, 255, 0.27)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 19px rgba(44, 67, 106, 0.09);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .tab {
+  border: 1px solid transparent;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .tab:hover {
+  border-color: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .tab.on {
+  border-color: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.76),
+    rgba(255, 255, 255, 0.42)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 4px 12px rgba(50, 76, 119, 0.1);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .seg,
+html[data-ui-theme="light"] .panel.mac-settings-window .view-tabs,
+html[data-ui-theme="light"] .panel.mac-settings-window .segmented {
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 11px;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.44),
+    rgba(255, 255, 255, 0.2)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 3px 10px rgba(43, 63, 98, 0.07);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .seg button,
+html[data-ui-theme="light"] .panel.mac-settings-window .view-tabs button,
+html[data-ui-theme="light"] .panel.mac-settings-window .segmented button {
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #5b6b84;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .seg button:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .view-tabs button:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .segmented button:hover {
+  background: rgba(255, 255, 255, 0.38);
+  color: #263a5a;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .seg button.on,
+html[data-ui-theme="light"] .panel.mac-settings-window .view-tabs button.active,
+html[data-ui-theme="light"] .panel.mac-settings-window .segmented button.active {
+  border-color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.92),
+    rgba(236, 244, 255, 0.7)
+  );
+  color: #253b61;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 6px rgba(41, 67, 111, 0.12);
+  font-weight: 650;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .switch {
+  width: 40px;
+  height: 23px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 999px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.56),
+    rgba(186, 202, 226, 0.34)
+  );
+  box-shadow:
+    inset 0 1px 2px rgba(47, 67, 101, 0.12),
+    0 2px 6px rgba(43, 64, 100, 0.08);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .switch .knob {
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  background: linear-gradient(145deg, #fff, #edf3fc);
+  box-shadow:
+    0 1px 3px rgba(29, 48, 80, 0.22),
+    inset 0 1px 0 #fff;
+  transition:
+    left 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .switch.on {
+  border-color: rgba(255, 255, 255, 0.86);
+  background: linear-gradient(135deg, #4a8bed, #6ba9f5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 3px 9px rgba(61, 119, 203, 0.25);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .switch.on .knob {
+  left: 18px;
+  background: linear-gradient(145deg, #fff, #f3f7fd);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window select,
+html[data-ui-theme="light"] .panel.mac-settings-window .shortcut-input,
+html[data-ui-theme="light"] .panel.mac-settings-window .color-control input[type="color"] {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.34);
+  color: #344563;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 3px 9px rgba(43, 64, 100, 0.06);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window select {
+  min-height: 34px;
+  padding: 7px 30px 7px 11px;
+  border-radius: 10px;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #61738f 50%),
+    linear-gradient(135deg, #61738f 50%, transparent 50%);
+  background-position:
+    calc(100% - 13px) 14px,
+    calc(100% - 9px) 14px;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window select:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .shortcut-input:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .color-control input[type="color"]:hover {
+  border-color: rgba(255, 255, 255, 0.98);
+  background-color: rgba(255, 255, 255, 0.54);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 13px rgba(43, 64, 100, 0.1);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .shortcut-input:focus,
+html[data-ui-theme="light"] .panel.mac-settings-window select:focus {
+  border-color: rgba(80, 133, 216, 0.72);
+  background-color: rgba(255, 255, 255, 0.64);
+  box-shadow:
+    0 0 0 3px rgba(81, 139, 222, 0.13),
+    inset 0 1px 0 #fff;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .row input[type="range"] {
+  height: 5px;
+  border-radius: 999px;
+  accent-color: #4d89e4;
+  cursor: pointer;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .row input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  border-radius: 50%;
+  appearance: none;
+  background: linear-gradient(145deg, #76b2fb, #3979d6);
+  box-shadow:
+    0 2px 5px rgba(37, 82, 147, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-mini,
+html[data-ui-theme="light"] .panel.mac-settings-window .color-reset,
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-use,
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-refresh,
+html[data-ui-theme="light"] .panel.mac-settings-window .panel-close {
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 10px;
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.48),
+    rgba(255, 255, 255, 0.24)
+  );
+  color: #3d5273;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 3px 9px rgba(43, 64, 100, 0.07);
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-mini:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .color-reset:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-refresh:hover:not(:disabled),
+html[data-ui-theme="light"] .panel.mac-settings-window .panel-close:hover {
+  border-color: rgba(255, 255, 255, 0.98);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.78),
+    rgba(255, 255, 255, 0.48)
+  );
+  color: #203b65;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 14px rgba(43, 64, 100, 0.11);
+  transform: translateY(-1px);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-mini:not(.btn-secondary):not(.btn-danger) {
+  border-color: rgba(255, 255, 255, 0.76);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.48),
+    rgba(255, 255, 255, 0.24)
+  );
+  color: #3d5273;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-mini:not(.btn-secondary):not(.btn-danger):hover {
+  border-color: rgba(255, 255, 255, 0.98);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.78),
+    rgba(255, 255, 255, 0.48)
+  );
+  color: #203b65;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-mini:not(.btn-secondary):not(.btn-danger):active {
+  background: rgba(230, 241, 255, 0.65);
+  box-shadow: inset 0 1px 2px rgba(41, 67, 111, 0.12);
+  transform: translateY(0) scale(0.98);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .color-reset {
+  padding: 6px 10px;
+  color: var(--panel-accent);
+  font-size: 11px;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-secondary {
+  color: var(--panel-secondary-text);
+  border-color: var(--panel-secondary-border);
+  background: var(--panel-secondary-bg);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-secondary:hover {
+  color: var(--panel-secondary-hover-text);
+  border-color: var(--panel-secondary-hover-border);
+  background: var(--panel-secondary-hover);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-danger {
+  color: var(--panel-danger-text);
+  border-color: var(--panel-danger-border);
+  background: var(--panel-danger-bg);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .btn-danger:hover {
+  color: var(--panel-danger-hover-text);
+  border-color: var(--panel-danger-hover-border);
+  background: var(--panel-danger-hover);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-use {
+  min-height: 34px;
+  padding: 7px 12px;
+  color: #324e7a;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-use.confirm {
+  border-color: rgba(206, 86, 99, 0.38);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 226, 230, 0.88),
+    rgba(255, 205, 212, 0.62)
+  );
+  color: #8e2834;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-use:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 13px rgba(43, 64, 100, 0.11);
+  transform: translateY(-1px);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-use.confirm:hover:not(:disabled) {
+  border-color: rgba(206, 86, 99, 0.54);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 216, 222, 0.94),
+    rgba(255, 192, 201, 0.74)
+  );
+  color: #7f202c;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-toggle {
+  border-radius: 12px;
+  transition: background 0.16s ease;
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-toggle:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-card,
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-item,
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-fallback,
+html[data-ui-theme="light"] .panel.mac-settings-window .theme-card {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.38),
+    rgba(255, 255, 255, 0.18)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 5px 14px rgba(43, 64, 100, 0.065);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .theme-card:hover,
+html[data-ui-theme="light"] .panel.mac-settings-window .reset-card:hover {
+  border-color: rgba(255, 255, 255, 0.94);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.58),
+    rgba(255, 255, 255, 0.28)
+  );
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .theme-card.selected {
+  border-color: rgba(91, 139, 220, 0.66);
+  background: linear-gradient(
+    140deg,
+    rgba(224, 239, 255, 0.72),
+    rgba(255, 255, 255, 0.44)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 6px 16px rgba(54, 107, 184, 0.12);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .metric {
+  border-color: rgba(255, 255, 255, 0.68);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.46),
+    rgba(255, 255, 255, 0.22)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 4px 11px rgba(43, 64, 100, 0.06);
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window .detail-button {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 9px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window :disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme="light"] .panel.mac-settings-window button,
+  html[data-ui-theme="light"] .panel.mac-settings-window input,
+  html[data-ui-theme="light"] .panel.mac-settings-window select {
+    transition-duration: 0.01ms;
+  }
 }
 </style>

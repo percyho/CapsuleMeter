@@ -39,6 +39,26 @@
         "url": "history.html",
         "visible": false,
         "center": true
+      },
+      {
+        "label": "capsule-widget",
+        "title": "Capsule Meter Widget",
+        "width": 140,
+        "height": 44,
+        "minWidth": 140,
+        "minHeight": 44,
+        "maxWidth": 140,
+        "maxHeight": 44,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "center": true
       }
     ]
   }

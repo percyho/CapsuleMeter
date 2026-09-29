@@ -1,41 +1,63 @@
-mod reset_credits;
 mod codex_cli;
+mod reset_credits;
 mod usage;
 mod window_pos;
 use serde::Serialize;
 use std::{
     process::Command,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicU8, Ordering},
         Arc,
     },
 };
-use tauri::{menu::MenuItem, Emitter, Manager};
+use tauri::{menu::MenuItem, Emitter, Manager, PhysicalPosition};
 
 #[derive(Clone)]
 struct TrayIconMenuState {
     switcher: MenuItem<tauri::Wry>,
-    usage_selected: Arc<AtomicBool>,
+    selected_mode: Arc<AtomicU8>,
 }
 
 impl TrayIconMenuState {
     fn select(&self, mode: &str) -> Result<(), String> {
-        let usage_selected = mode == "usage";
+        let (selected_mode, next_label) = match mode {
+            "usage" => (1, "Logo"),
+            _ => (0, "用量环"),
+        };
         self.switcher
-            .set_text(if usage_selected { "Logo" } else { "用量环" })
+            .set_text(next_label)
             .map_err(|error| format!("更新托盘切换菜单失败：{error}"))?;
-        self.usage_selected.store(usage_selected, Ordering::Release);
+        self.selected_mode.store(selected_mode, Ordering::Release);
         Ok(())
     }
 
     fn toggle(&self) -> Result<&'static str, String> {
-        let next_mode = if self.usage_selected.load(Ordering::Acquire) {
-            "logo"
-        } else {
-            "usage"
+        let next_mode = match self.selected_mode.load(Ordering::Acquire) {
+            1 => "logo",
+            _ => "usage",
         };
         self.select(next_mode)?;
         Ok(next_mode)
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Clone)]
+struct CapsuleWidgetMenuState {
+    item: MenuItem<tauri::Wry>,
+}
+
+#[cfg(target_os = "macos")]
+impl CapsuleWidgetMenuState {
+    fn set_visible(&self, visible: bool) -> Result<(), String> {
+        let label = if visible {
+            "隐藏桌面胶囊小工具"
+        } else {
+            "显示桌面胶囊小工具"
+        };
+        self.item
+            .set_text(label)
+            .map_err(|error| format!("更新桌面小工具菜单失败：{error}"))
     }
 }
 
@@ -50,6 +72,81 @@ struct UpdateInfo {
 #[tauri::command]
 fn is_macos() -> bool {
     cfg!(target_os = "macos")
+}
+
+#[tauri::command]
+fn set_capsule_widget_visible(
+    app: tauri::AppHandle,
+    visible: bool,
+    x: Option<i32>,
+    y: Option<i32>,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window("capsule-widget")
+        .ok_or_else(|| "桌面胶囊小工具窗口未初始化".to_string())?;
+    if !visible {
+        window
+            .hide()
+            .map_err(|error| format!("隐藏桌面小工具失败：{error}"))?;
+        #[cfg(target_os = "macos")]
+        {
+            app.state::<CapsuleWidgetMenuState>().set_visible(false)?;
+            let _ = app.emit("capsule-widget-state", false);
+        }
+        return Ok(());
+    }
+
+    if let (Some(x), Some(y)) = (x, y) {
+        window
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(|error| format!("设置桌面小工具位置失败：{error}"))?;
+    } else {
+        let monitor = window
+            .current_monitor()
+            .map_err(|error| format!("获取桌面小工具屏幕失败：{error}"))?
+            .or_else(|| window.primary_monitor().ok().flatten());
+        if let Some(monitor) = monitor {
+            let scale = window.scale_factor().unwrap_or(1.0);
+            let monitor_position = monitor.position();
+            let monitor_size = monitor.size();
+            let inset = (164.0 * scale).round() as i32;
+            let top = (42.0 * scale).round() as i32;
+            window
+                .set_position(PhysicalPosition::new(
+                    monitor_position.x + monitor_size.width as i32 - inset,
+                    monitor_position.y + top,
+                ))
+                .map_err(|error| format!("设置桌面小工具位置失败：{error}"))?;
+        }
+    }
+
+    window
+        .set_always_on_top(true)
+        .map_err(|error| format!("设置桌面小工具置顶失败：{error}"))?;
+    window
+        .show()
+        .map_err(|error| format!("显示桌面小工具失败：{error}"))?;
+    #[cfg(target_os = "macos")]
+    {
+        app.state::<CapsuleWidgetMenuState>().set_visible(true)?;
+        let _ = app.emit("capsule-widget-state", true);
+    }
+    window
+        .set_focus()
+        .map_err(|error| format!("聚焦桌面小工具失败：{error}"))
+}
+
+#[tauri::command]
+fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "设置窗口未初始化".to_string())?;
+    window
+        .show()
+        .map_err(|error| format!("显示设置窗口失败：{error}"))?;
+    window
+        .set_focus()
+        .map_err(|error| format!("聚焦设置窗口失败：{error}"))
 }
 
 #[tauri::command]
@@ -177,6 +274,21 @@ fn usage_ring_icon(five_hour: f64, weekly: f64) -> tauri::image::Image<'static> 
     tauri::image::Image::new_owned(rgba, size, size)
 }
 
+fn monochrome_template_icon(source: &tauri::image::Image<'_>) -> tauri::image::Image<'static> {
+    let mut rgba = Vec::with_capacity(source.rgba().len());
+    for pixel in source.rgba().chunks_exact(4) {
+        let luminance = (u32::from(pixel[0]) * 299
+            + u32::from(pixel[1]) * 587
+            + u32::from(pixel[2]) * 114)
+            / 1000;
+        // Keep the bright logo strokes and dots while dropping the dark app-icon fill.
+        let mask = luminance.saturating_sub(40).min(50) * 255 / 50;
+        let alpha = u32::from(pixel[3]) * mask / 255;
+        rgba.extend_from_slice(&[255, 255, 255, alpha as u8]);
+    }
+    tauri::image::Image::new_owned(rgba, source.width(), source.height())
+}
+
 fn tray_reset_hint(seconds: Option<i64>) -> String {
     let Some(seconds) = seconds else {
         return String::new();
@@ -228,18 +340,24 @@ fn update_tray_icon(
     five_hour_reset_after_seconds: Option<i64>,
     weekly_reset_after_seconds: Option<i64>,
 ) -> Result<(), String> {
-    let normalized_mode = if mode == "usage" { "usage" } else { "logo" };
+    let normalized_mode = match mode.as_str() {
+        "usage" => "usage",
+        _ => "logo",
+    };
     let tray = app
         .tray_by_id("main-tray")
         .ok_or_else(|| "托盘尚未初始化".to_string())?;
-    let icon = if normalized_mode == "usage" {
-        usage_ring_icon(five_hour.unwrap_or(0.0), weekly.unwrap_or(0.0))
-    } else {
-        app.default_window_icon()
-            .cloned()
-            .ok_or_else(|| "应用 Logo 不可用".to_string())?
+    let icon = match normalized_mode {
+        "usage" => usage_ring_icon(five_hour.unwrap_or(0.0), weekly.unwrap_or(0.0)),
+        _ => monochrome_template_icon(
+            app.default_window_icon()
+                .ok_or_else(|| "应用 Logo 不可用".to_string())?,
+        ),
     };
-    tray.set_icon(Some(icon))
+    tray.set_icon_with_as_template(
+        Some(icon),
+        cfg!(target_os = "macos") && normalized_mode == "logo",
+    )
         .map_err(|error| format!("更新托盘图标失败：{error}"))?;
     let tooltip = tray_tooltip(
         five_hour,
@@ -338,6 +456,8 @@ pub fn run() {
             diagnose_codex,
             check_update,
             is_macos,
+            set_capsule_widget_visible,
+            show_settings_window,
             update_tray_icon,
             quit_app
         ])
@@ -377,6 +497,18 @@ pub fn run() {
             };
             let show = MenuItem::with_id(app, "show", show_label, true, None::<&str>)?;
             let refresh = MenuItem::with_id(app, "refresh", "立即刷新", true, None::<&str>)?;
+            #[cfg(target_os = "macos")]
+            let capsule_widget = MenuItem::with_id(
+                app,
+                "capsule-widget",
+                "显示桌面胶囊小工具",
+                true,
+                None::<&str>,
+            )?;
+            #[cfg(target_os = "macos")]
+            app.manage(CapsuleWidgetMenuState {
+                item: capsule_widget.clone(),
+            });
             #[cfg(not(target_os = "macos"))]
             let settings = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
             #[cfg(not(target_os = "macos"))]
@@ -385,13 +517,20 @@ pub fn run() {
             let separator = PredefinedMenuItem::separator(app)?;
             let tray_icon_menu = TrayIconMenuState {
                 switcher: MenuItem::with_id(app, "tray-icon-switch", "用量环", true, None::<&str>)?,
-                usage_selected: Arc::new(AtomicBool::new(false)),
+                selected_mode: Arc::new(AtomicU8::new(0)),
             };
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             #[cfg(target_os = "macos")]
             let menu = Menu::with_items(
                 app,
-                &[&show, &refresh, &separator, &tray_icon_menu.switcher, &quit],
+                &[
+                    &show,
+                    &refresh,
+                    &capsule_widget,
+                    &separator,
+                    &tray_icon_menu.switcher,
+                    &quit,
+                ],
             )?;
             #[cfg(not(target_os = "macos"))]
             let menu = Menu::with_items(
@@ -406,8 +545,10 @@ pub fn run() {
                 ],
             )?;
             let tray_icon_menu_for_event = tray_icon_menu.clone();
+            let app_icon = app.default_window_icon().unwrap();
             TrayIconBuilder::with_id("main-tray")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(monochrome_template_icon(app_icon))
+                .icon_as_template(true)
                 .tooltip("正在加载用量…")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
@@ -420,6 +561,27 @@ pub fn run() {
                     }
                     "refresh" => {
                         let _ = app.emit("tray-refresh", ());
+                    }
+                    #[cfg(target_os = "macos")]
+                    "capsule-widget" => {
+                        if let Some(widget) = app.get_webview_window("capsule-widget") {
+                            let visible = widget.is_visible().unwrap_or(false);
+                            let next_visible = !visible;
+                            let result = if next_visible {
+                                widget.show()
+                            } else {
+                                widget.hide()
+                            };
+                            if result.is_ok() {
+                                if next_visible {
+                                    let _ = widget.set_focus();
+                                }
+                                let _ = app
+                                    .state::<CapsuleWidgetMenuState>()
+                                    .set_visible(next_visible);
+                                let _ = app.emit("capsule-widget-state", next_visible);
+                            }
+                        }
                     }
                     "settings" => {
                         if let Some(w) = app.get_webview_window("main") {
