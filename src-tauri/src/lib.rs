@@ -1,4 +1,5 @@
 mod reset_credits;
+mod codex_cli;
 mod usage;
 mod window_pos;
 use serde::Serialize;
@@ -47,6 +48,11 @@ struct UpdateInfo {
 }
 
 #[tauri::command]
+fn is_macos() -> bool {
+    cfg!(target_os = "macos")
+}
+
+#[tauri::command]
 fn start_codex_login() -> Result<(), String> {
     #[cfg(windows)]
     Command::new("cmd")
@@ -54,7 +60,7 @@ fn start_codex_login() -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("无法启动 codex login：{e}"))?;
     #[cfg(not(windows))]
-    Command::new("codex")
+    Command::new(codex_cli::executable())
         .arg("login")
         .spawn()
         .map_err(|e| format!("无法启动 codex login：{e}"))?;
@@ -63,7 +69,7 @@ fn start_codex_login() -> Result<(), String> {
 
 #[tauri::command]
 fn diagnose_codex() -> Result<String, String> {
-    let output = Command::new("codex")
+    let output = Command::new(codex_cli::executable())
         .arg("doctor")
         .output()
         .map_err(|e| format!("无法运行 codex doctor：{e}"))?;
@@ -303,7 +309,7 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -312,11 +318,14 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .manage(window_pos::SnapEnabled(Default::default()));
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder
         .manage(window_pos::WindowPosState(Default::default()))
         .manage(window_pos::SnapState {
             last_move: Default::default(),
-        })
-        .manage(window_pos::SnapEnabled(Default::default()))
+        });
+    builder
         .invoke_handler(tauri::generate_handler![
             usage::fetch_usage,
             usage::fetch_analytics,
@@ -328,6 +337,7 @@ pub fn run() {
             start_codex_login,
             diagnose_codex,
             check_update,
+            is_macos,
             update_tray_icon,
             quit_app
         ])
@@ -337,6 +347,9 @@ pub fn run() {
                 tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
                 Emitter,
             };
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            #[cfg(not(target_os = "macos"))]
             window_pos::restore(app.handle());
             if let Some(history_window) = app.get_webview_window("history") {
                 let window_to_hide = history_window.clone();
@@ -347,15 +360,40 @@ pub fn run() {
                     }
                 });
             }
-            let show = MenuItem::with_id(app, "show", "显示胶囊", true, None::<&str>)?;
+            #[cfg(target_os = "macos")]
+            if let Some(main_window) = app.get_webview_window("main") {
+                let window_to_hide = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_to_hide.hide();
+                    }
+                });
+            }
+            let show_label = if cfg!(target_os = "macos") {
+                "打开用量面板"
+            } else {
+                "显示胶囊"
+            };
+            let show = MenuItem::with_id(app, "show", show_label, true, None::<&str>)?;
             let refresh = MenuItem::with_id(app, "refresh", "立即刷新", true, None::<&str>)?;
+            #[cfg(not(target_os = "macos"))]
             let settings = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
+            #[cfg(not(target_os = "macos"))]
+            let separator = PredefinedMenuItem::separator(app)?;
+            #[cfg(target_os = "macos")]
             let separator = PredefinedMenuItem::separator(app)?;
             let tray_icon_menu = TrayIconMenuState {
                 switcher: MenuItem::with_id(app, "tray-icon-switch", "用量环", true, None::<&str>)?,
                 usage_selected: Arc::new(AtomicBool::new(false)),
             };
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            #[cfg(target_os = "macos")]
+            let menu = Menu::with_items(
+                app,
+                &[&show, &refresh, &separator, &tray_icon_menu.switcher, &quit],
+            )?;
+            #[cfg(not(target_os = "macos"))]
             let menu = Menu::with_items(
                 app,
                 &[
@@ -376,8 +414,7 @@ pub fn run() {
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+                            window_pos::show_main(app, &w);
                         }
                         let _ = app.emit("tray-show", ());
                     }
@@ -386,8 +423,7 @@ pub fn run() {
                     }
                     "settings" => {
                         if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+                            window_pos::show_main(app, &w);
                         }
                         let _ = app.emit("tray-open-settings", ());
                     }
@@ -407,8 +443,7 @@ pub fn run() {
                     } = event
                     {
                         if let Some(w) = tray.app_handle().get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+                            window_pos::show_main(tray.app_handle(), &w);
                         }
                         let _ = tray.app_handle().emit("tray-show", ());
                     }
@@ -419,7 +454,8 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
-        .run(|app_handle, event| {
-            window_pos::on_event(app_handle, event);
+        .run(|_app_handle, _event| {
+            #[cfg(not(target_os = "macos"))]
+            window_pos::on_event(_app_handle, _event);
         });
 }

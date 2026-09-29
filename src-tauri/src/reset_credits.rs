@@ -66,7 +66,7 @@ fn run_rpc(method: &str, params: Value) -> Result<Value, String> {
         command
     };
     #[cfg(not(windows))]
-    let mut command = Command::new("codex");
+    let mut command = Command::new(crate::codex_cli::executable());
     #[cfg(not(windows))]
     command.args(["app-server", "--stdio"]);
     #[cfg(windows)]

@@ -4,9 +4,9 @@
   "version": "1.2.0",
   "identifier": "com.codexcapsule.app",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -51,15 +51,20 @@
   },
   "bundle": {
     "active": true,
+    "category": "Utility",
     "targets": [
       "nsis"
     ],
     "icon": [
+      "icons/icon.icns",
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",

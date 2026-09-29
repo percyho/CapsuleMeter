@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { show as showApp } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -44,6 +45,8 @@ import {
 const DRAG_THRESHOLD = 4;
 const CAPSULE_WIDTH = 140;
 const CAPSULE_HEIGHT = 34;
+const isMacOS = ref(false);
+const platformReady = ref(false);
 let dragTracking: { sx: number; sy: number; started: boolean } | null = null;
 
 function startWindowDrag() {
@@ -228,6 +231,30 @@ const trayIconMode = ref<TrayIconMode>(
 );
 const systemMessage = ref("");
 
+async function showCapsuleWindow() {
+  const win = getCurrentWindow();
+  try {
+    // A hidden menu-bar app must be activated as well as its window on macOS.
+    // Other platforms do not expose an app-level show operation.
+    await showApp();
+  } catch {
+    // Window restoration below remains valid on platforms without app.show.
+  }
+  try {
+    await win.unminimize();
+    await win.show();
+    await win.setFocus();
+    if (isMacOS.value) {
+      showPanel.value = true;
+    } else {
+      capsuleVisible.value = true;
+      localStorage.setItem("capsuleVisible", "true");
+    }
+  } catch (reason) {
+    systemMessage.value = `显示胶囊失败：${String(reason)}`;
+  }
+}
+
 async function openHistory() {
   if (historyOpening.value) return;
   historyOpening.value = true;
@@ -261,10 +288,7 @@ const {
       localStorage.setItem("capsuleVisible", "false");
       await win.hide();
     } else {
-      capsuleVisible.value = true;
-      localStorage.setItem("capsuleVisible", "true");
-      await win.show();
-      await win.setFocus();
+      await showCapsuleWindow();
     }
   },
 });
@@ -563,12 +587,15 @@ watch(activeTab, (tab) => {
 
 // —— 外观 ——
 function applyWindowSettings() {
-  document.body.style.opacity = String(opacity.value);
+  // On macOS the main window is a settings surface, so capsule opacity must not
+  // fade the whole frosted-glass window.
+  document.body.style.opacity = isMacOS.value ? "1" : String(opacity.value);
   document.documentElement.style.setProperty(
     "--num-size",
     fontSize.value + "px",
   );
-  applyTheme();
+  // Keep the macOS settings surface on one consistent frosted-glass palette.
+  applyTheme(isMacOS.value ? "light" : undefined);
 }
 
 async function updateTrayIcon(data = usage.value) {
@@ -757,7 +784,9 @@ function setCapsuleStyle(style: CapsuleTheme) {
 // —— 行为 ——
 async function applyAlwaysOnTop() {
   try {
-    await getCurrentWindow().setAlwaysOnTop(alwaysOnTop.value);
+    await getCurrentWindow().setAlwaysOnTop(
+      isMacOS.value ? false : alwaysOnTop.value,
+    );
   } catch {}
 }
 function onAlwaysOnTopChange() {
@@ -776,15 +805,14 @@ function onSnapChange() {
 }
 
 async function setCapsuleVisibility(visible: boolean) {
+  if (visible) {
+    await showCapsuleWindow();
+    return;
+  }
   capsuleVisible.value = visible;
   localStorage.setItem("capsuleVisible", String(visible));
   const win = getCurrentWindow();
-  if (visible) {
-    await win.show();
-    await win.setFocus();
-  } else {
-    await win.hide();
-  }
+  await win.hide();
 }
 
 function onCapsuleVisibilityChange() {
@@ -970,7 +998,7 @@ function resetDefaults() {
   capsuleColors.rightFill = "";
   capsuleThemeOptions.forEach(({ id }) => delete capsuleThemeColors[id]);
   capsuleStyle.value = "flat";
-  uiTheme.value = "system";
+  uiTheme.value = isMacOS.value ? "light" : "system";
   setLocale("zh-CN");
   alwaysOnTop.value = true;
   snapEnabled.value = true;
@@ -1023,11 +1051,21 @@ function resetDefaults() {
     onAutostartChange();
   }
   getCurrentWindow().setSize(
-    new LogicalSize(PANEL_DEFAULT_WIDTH, CAPSULE_HEIGHT + PANEL_DEFAULT_HEIGHT),
+    new LogicalSize(
+      isMacOS.value ? 820 : PANEL_DEFAULT_WIDTH,
+      isMacOS.value ? 620 : CAPSULE_HEIGHT + PANEL_DEFAULT_HEIGHT,
+    ),
   );
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    isMacOS.value = await invoke<boolean>("is_macos");
+  } catch {
+    isMacOS.value = /Mac/i.test(`${navigator.platform} ${navigator.userAgent}`);
+  }
+  showPanel.value = isMacOS.value;
+  platformReady.value = true;
   applyWindowSettings();
   applyAlwaysOnTop();
   applySnap();
@@ -1039,18 +1077,20 @@ onMounted(() => {
   void applyGlobalShortcut().catch((reason) => {
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   });
-  if (!capsuleVisible.value) void getCurrentWindow().hide();
+  if (!isMacOS.value && !capsuleVisible.value) {
+    void getCurrentWindow().hide();
+  }
   void listen("tray-refresh", () => void refresh()).then((unlisten) =>
     unlistenEvents.push(unlisten),
   );
-  void listen("tray-show", () => {
-    capsuleVisible.value = true;
-    localStorage.setItem("capsuleVisible", "true");
-  }).then((unlisten) => unlistenEvents.push(unlisten));
+  void listen("tray-show", () => void showCapsuleWindow()).then((unlisten) =>
+    unlistenEvents.push(unlisten),
+  );
   void listen("tray-open-settings", () => {
-    capsuleVisible.value = true;
-    localStorage.setItem("capsuleVisible", "true");
-    if (!showPanel.value) void togglePanel();
+    void (async () => {
+      await showCapsuleWindow();
+      if (!showPanel.value) await togglePanel();
+    })();
   }).then((unlisten) => unlistenEvents.push(unlisten));
   void listen<TrayIconMode>("tray-icon-mode-change", ({ payload }) => {
     onTrayIconModeChange(payload);
@@ -1078,6 +1118,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+    v-if="platformReady && !isMacOS"
     class="capsule-shell"
     :class="{ 'capsule-shell-right': panelAlignRight }"
     :style="speedIndicatorStyle"
@@ -1130,16 +1171,16 @@ onBeforeUnmount(() => {
   </div>
 
   <div
-    v-if="showPanel"
+    v-if="platformReady && (isMacOS || showPanel)"
     class="panel"
-    :class="{ 'align-right': panelAlignRight }"
-    :style="{ width: panelW + 'px', height: panelH + 'px' }"
+    :class="{ 'align-right': !isMacOS && panelAlignRight, 'mac-settings-window': isMacOS }"
+    :style="isMacOS ? { width: '100%', height: '100%' } : { width: panelW + 'px', height: panelH + 'px' }"
     @contextmenu.prevent
   >
-    <div class="panel-head" @mousedown="onPanelDragStart">
+    <div class="panel-head" @mousedown="!isMacOS && onPanelDragStart($event)">
       <div class="panel-heading">
-        <span class="panel-title">{{ t("设置") }}</span>
-        <span class="panel-description">{{ t("个性化用量胶囊") }}</span>
+        <span class="panel-title">{{ isMacOS ? "Capsule Meter" : t("设置") }}</span>
+        <span class="panel-description">{{ isMacOS ? "Codex 用量与偏好设置" : t("个性化用量胶囊") }}</span>
       </div>
       <div class="panel-account">
         <span class="panel-sub">{{
@@ -1152,7 +1193,27 @@ onBeforeUnmount(() => {
           >{{ usage.account }}</span
         >
       </div>
+      <div v-if="isMacOS" class="mac-icon-picker">
+        <span class="mac-icon-label">菜单栏图标</span>
+        <div class="seg" aria-label="菜单栏图标样式">
+          <button
+            :class="{ on: trayIconMode === 'logo' }"
+            :aria-pressed="trayIconMode === 'logo'"
+            @click="onTrayIconModeChange('logo')"
+          >
+            Logo
+          </button>
+          <button
+            :class="{ on: trayIconMode === 'usage' }"
+            :aria-pressed="trayIconMode === 'usage'"
+            @click="onTrayIconModeChange('usage')"
+          >
+            {{ t("用量环") }}
+          </button>
+        </div>
+      </div>
       <button
+        v-if="!isMacOS"
         class="panel-close"
         :title="t('关闭设置')"
         :aria-label="t('关闭设置')"
@@ -1300,7 +1361,7 @@ onBeforeUnmount(() => {
 
       <div class="panel-body">
         <template v-if="activeTab === 'appearance'">
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("界面主题") }}</span>
             <div class="seg" aria-label="界面主题">
               <button
@@ -1340,7 +1401,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("透明度") }}</span>
             <input
               type="range"
@@ -1352,7 +1413,7 @@ onBeforeUnmount(() => {
             />
             <span class="row-val">{{ Math.round(opacity * 100) }}%</span>
           </div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("字号") }}</span>
             <input
               type="range"
@@ -1364,7 +1425,7 @@ onBeforeUnmount(() => {
             />
             <span class="row-val">{{ fontSize }}px</span>
           </div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("显示用量数值") }}</span>
             <button
               class="switch"
@@ -1374,13 +1435,13 @@ onBeforeUnmount(() => {
               <span class="knob"></span>
             </button>
           </div>
-          <div class="group-label color-group-heading">
+          <div v-if="!isMacOS" class="group-label color-group-heading">
             <span>{{ t("胶囊颜色") }}</span>
             <button class="color-reset" @click="resetCapsuleColors">
               {{ t("恢复主题默认颜色") }}
             </button>
           </div>
-          <label class="row color-row" for="capsule-background-color">
+          <label v-if="!isMacOS" class="row color-row" for="capsule-background-color">
             <span class="row-name">{{ t("胶囊底色") }}</span>
             <span class="color-control">
               <input
@@ -1392,7 +1453,7 @@ onBeforeUnmount(() => {
               <span class="color-value">{{ capsuleColors.background || t("主题默认") }}</span>
             </span>
           </label>
-          <label class="row color-row" for="capsule-left-fill-color">
+          <label v-if="!isMacOS" class="row color-row" for="capsule-left-fill-color">
             <span class="row-name">{{ t("左侧填充色") }}</span>
             <span class="color-control">
               <input
@@ -1404,7 +1465,7 @@ onBeforeUnmount(() => {
               <span class="color-value">{{ capsuleColors.leftFill || t("主题默认") }}</span>
             </span>
           </label>
-          <label class="row color-row" for="capsule-right-fill-color">
+          <label v-if="!isMacOS" class="row color-row" for="capsule-right-fill-color">
             <span class="row-name">{{ t("右侧填充色") }}</span>
             <span class="color-control">
               <input
@@ -1431,7 +1492,7 @@ onBeforeUnmount(() => {
 
         <template v-if="activeTab === 'behavior'">
           <div class="group-label">{{ t("行为") }}</div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("窗口置顶") }}</span>
             <button
               class="switch"
@@ -1444,7 +1505,7 @@ onBeforeUnmount(() => {
               <span class="knob"></span>
             </button>
           </div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("贴边吸附") }}</span>
             <button
               class="switch"
@@ -1457,7 +1518,7 @@ onBeforeUnmount(() => {
               <span class="knob"></span>
             </button>
           </div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("显示模式") }}</span>
             <div class="seg">
               <button
@@ -1480,7 +1541,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <div class="row">
+          <div v-if="!isMacOS" class="row">
             <span class="row-name">{{ t("重置显示时长") }}</span>
             <select
               v-model.number="resetShowSec"
@@ -1565,7 +1626,7 @@ onBeforeUnmount(() => {
 
         <template v-if="activeTab === 'system'">
           <div class="group-label">{{ t("系统") }}</div>
-          <div class="row row-flat">
+          <div v-if="!isMacOS" class="row row-flat">
             <span class="row-name">{{ t("显示胶囊") }}</span>
             <button
               class="switch"
@@ -1588,7 +1649,7 @@ onBeforeUnmount(() => {
               <span class="knob"></span>
             </button>
           </div>
-          <div class="row row-flat">
+          <div v-if="!isMacOS" class="row row-flat">
             <span class="row-name">{{ t("托盘图标") }}</span>
             <div class="seg" aria-label="托盘图标样式">
               <button
@@ -1723,7 +1784,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div class="resize-handle" @mousedown="onPanelResizeStart"></div>
+    <div v-if="!isMacOS" class="resize-handle" @mousedown="onPanelResizeStart"></div>
   </div>
 </template>
 
@@ -2025,6 +2086,24 @@ body {
   text-shadow: none;
 }
 
+/* Keep error placeholders readable even on a light desktop background. */
+.capsule-flat.error {
+  border: 1px solid rgba(248, 113, 113, 0.72);
+  background: linear-gradient(
+    180deg,
+    rgba(54, 25, 31, 0.96),
+    rgba(29, 18, 23, 0.96)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.capsule-flat.error .num {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+}
+
 .capsule-skeuomorphic {
   border-color: rgba(149, 164, 188, 0.82);
   background: transparent;
@@ -2209,6 +2288,109 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(20px);
   overflow: hidden;
+}
+
+/* Native macOS preferences window: let AppKit provide the window material,
+   then keep the content translucent so its frosted background stays visible. */
+.panel.mac-settings-window {
+  --panel-bg: rgba(204, 220, 248, 0.06);
+  --panel-border: rgba(255, 255, 255, 0.34);
+  --panel-text: #202736;
+  --panel-title: #172033;
+  --panel-val: #5d6778;
+  --panel-accent: #315fbd;
+  --panel-bg-active: rgba(44, 78, 135, 0.12);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.mac-settings-window .panel-head {
+  min-height: 78px;
+  padding: 12px 24px;
+  gap: 22px;
+  border-color: rgba(45, 58, 78, 0.11);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: default;
+}
+
+.mac-settings-window .panel-title {
+  font-size: 17px;
+  letter-spacing: -0.2px;
+}
+
+.mac-settings-window .panel-description {
+  font-size: 11px;
+}
+
+.mac-settings-window .panel-account {
+  flex: 1 1 auto;
+  padding-right: 10px;
+}
+
+.mac-icon-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.mac-icon-label {
+  color: var(--panel-val);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mac-settings-window .settings-shell {
+  min-height: 0;
+}
+
+.mac-settings-window .tabs {
+  flex-basis: 150px;
+  padding: 16px 10px;
+  gap: 4px;
+  border-color: rgba(45, 58, 78, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mac-settings-window .tab {
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.mac-settings-window .panel-body {
+  padding: 22px 28px 28px;
+  gap: 9px;
+}
+
+.mac-settings-window .row {
+  min-height: 48px;
+  padding: 10px 6px;
+  color: var(--panel-text);
+  border-color: rgba(45, 58, 78, 0.1);
+}
+
+.mac-settings-window .row-name {
+  color: var(--panel-text);
+}
+
+.mac-settings-window .panel-foot {
+  padding: 12px 24px 16px;
+  border-color: rgba(45, 58, 78, 0.11);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mac-settings-window .resize-handle {
+  display: none;
 }
 
 .panel-head {
@@ -2832,6 +3014,17 @@ html[data-ui-theme="light"] .panel {
   box-shadow:
     0 16px 40px rgba(16, 24, 40, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+html[data-ui-theme="light"] .panel.mac-settings-window {
+  --panel-bg: rgba(204, 220, 248, 0.06);
+  --panel-border: rgba(255, 255, 255, 0.34);
+  --panel-title: #172033;
+  --panel-text: #202736;
+  --panel-val: #5d6778;
+  --panel-accent: #315fbd;
+  --panel-bg-active: rgba(44, 78, 135, 0.12);
+  box-shadow: none;
 }
 
 html[data-ui-theme="light"] .panel-head,

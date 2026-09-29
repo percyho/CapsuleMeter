@@ -159,12 +159,59 @@ fn system_proxy_url() -> Option<String> {
     Some(format!("http://{}", addr.trim_end_matches('/')))
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn system_proxy_url() -> Option<String> {
+    let output = std::process::Command::new("/usr/sbin/scutil")
+        .arg("--proxy")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let config = String::from_utf8_lossy(&output.stdout);
+    let value = |key: &str| {
+        config.lines().find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            (name.trim() == key).then(|| value.trim().trim_matches('"'))
+        })
+    };
+
+    // Prefer the HTTPS proxy, then fall back to the HTTP proxy. macOS reports
+    // both as HTTP CONNECT proxies in `scutil --proxy`.
+    for (enabled_key, host_key, port_key) in [
+        ("HTTPSEnable", "HTTPSProxy", "HTTPSPort"),
+        ("HTTPEnable", "HTTPProxy", "HTTPPort"),
+    ] {
+        if value(enabled_key) != Some("1") {
+            continue;
+        }
+        let (Some(host), Some(port)) = (value(host_key), value(port_key)) else {
+            continue;
+        };
+        let Ok(port) = port.parse::<u16>() else {
+            continue;
+        };
+        if host.is_empty() || port == 0 {
+            continue;
+        }
+        let host = if host.contains(':') && !host.starts_with('[') {
+            format!("[{host}]")
+        } else {
+            host.to_string()
+        };
+        return Some(format!("http://{host}:{port}"));
+    }
+
+    None
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn system_proxy_url() -> Option<String> {
     None
 }
 
-/// 构建 HTTP 客户端：自动使用 Windows 系统代理（如 Clash），未配置则直连
+/// 构建 HTTP 客户端：自动使用 Windows/macOS 系统代理，未配置则直连
 fn build_http_client() -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))

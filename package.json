@@ -9,6 +9,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri",
+    "build:macos": "tauri build --bundles app --target universal-apple-darwin",
+    "build:macos:arm64": "tauri build --bundles app --target aarch64-apple-darwin",
     "build:patch": "node scripts/bump-version.js patch && tauri build",
     "build:minor": "node scripts/bump-version.js minor && tauri build",
     "build:major": "node scripts/bump-version.js major && tauri build"

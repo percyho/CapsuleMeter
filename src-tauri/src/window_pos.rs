@@ -1,13 +1,22 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+#[cfg(not(target_os = "macos"))]
+use serde::Deserialize;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
+#[cfg(not(target_os = "macos"))]
+use std::sync::Arc;
+#[cfg(not(target_os = "macos"))]
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent, WindowEvent};
+use tauri::{AppHandle, Manager, PhysicalPosition, WebviewWindow};
+#[cfg(not(target_os = "macos"))]
+use tauri::{RunEvent, WindowEvent};
 
 /// 窗口位置状态：拖动过程中仅更新内存，退出时写盘一次
+#[cfg(not(target_os = "macos"))]
 pub struct WindowPosState(pub Mutex<Option<PhysicalPosition<i32>>>);
 
 /// 贴边吸附状态：记录最后一次窗口移动时间，用于拖动结束后的吸附检测
+#[cfg(not(target_os = "macos"))]
 pub struct SnapState {
     pub last_move: Arc<Mutex<Option<Instant>>>,
 }
@@ -24,13 +33,17 @@ pub fn set_snap_enabled(state: tauri::State<SnapEnabled>, enabled: bool) {
 }
 
 /// 吸附判定延迟：拖动停止这么久之后才执行吸附
+#[cfg(not(target_os = "macos"))]
 const SNAP_DELAY_MS: u64 = 250;
 /// 吸附重试次数：拖动停止后系统可能补发 Moved 事件，需要重试直到真正空闲
+#[cfg(not(target_os = "macos"))]
 const SNAP_RETRY: u32 = 5;
 /// 吸附判定阈值：窗口边缘距屏幕工作区边缘小于该逻辑像素即吸附
+#[cfg(not(target_os = "macos"))]
 const SNAP_MARGIN_LOGICAL: i32 = 24;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
+#[cfg_attr(not(target_os = "macos"), derive(Deserialize))]
 struct Pos {
     x: i32,
     y: i32,
@@ -45,6 +58,69 @@ fn pos_file(app: &AppHandle) -> PathBuf {
     dir.join("window_pos.json")
 }
 
+fn clamp_axis(value: i32, origin: i32, display_size: u32, window_size: u32) -> i32 {
+    let lower = i64::from(origin);
+    let upper = (lower + i64::from(display_size) - i64::from(window_size)).max(lower);
+    i64::from(value).clamp(lower, upper) as i32
+}
+
+fn distance_to_axis(value: i32, origin: i32, display_size: u32) -> i64 {
+    let value = i64::from(value);
+    let start = i64::from(origin);
+    let end = start + i64::from(display_size);
+    if value < start {
+        start - value
+    } else if value > end {
+        value - end
+    } else {
+        0
+    }
+}
+
+fn clamp_to_monitor(
+    window: &WebviewWindow,
+    position: PhysicalPosition<i32>,
+) -> Option<PhysicalPosition<i32>> {
+    let window_size = window.outer_size().ok()?;
+    let monitors = window.available_monitors().ok()?;
+    let monitor = monitors.iter().min_by_key(|monitor| {
+        let origin = monitor.position();
+        let size = monitor.size();
+        let dx = distance_to_axis(position.x, origin.x, size.width);
+        let dy = distance_to_axis(position.y, origin.y, size.height);
+        dx * dx + dy * dy
+    })?;
+
+    let origin = monitor.position();
+    let size = monitor.size();
+    Some(PhysicalPosition::new(
+        clamp_axis(position.x, origin.x, size.width, window_size.width),
+        clamp_axis(position.y, origin.y, size.height, window_size.height),
+    ))
+}
+
+/// Keep the capsule on a connected display when restoring or showing it.
+pub fn ensure_visible(window: &WebviewWindow) -> Option<PhysicalPosition<i32>> {
+    let current = window.outer_position().ok()?;
+    let visible = clamp_to_monitor(window, current).unwrap_or(current);
+    if visible != current {
+        let _ = window.set_position(visible);
+    }
+    Some(visible)
+}
+
+pub fn show_main(app: &AppHandle, window: &WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    let _ = app.show();
+    if let Some(position) = ensure_visible(window) {
+        save(app, position);
+    }
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+#[cfg(not(target_os = "macos"))]
 pub fn restore(app: &AppHandle) {
     let path = pos_file(app);
     let Ok(raw) = std::fs::read_to_string(&path) else {
@@ -54,7 +130,12 @@ pub fn restore(app: &AppHandle) {
         return;
     };
     if let Some(window) = app.get_webview_window("main") {
-        let _ = window.set_position(PhysicalPosition::new(pos.x, pos.y));
+        let requested = PhysicalPosition::new(pos.x, pos.y);
+        let restored = clamp_to_monitor(&window, requested).unwrap_or(requested);
+        let _ = window.set_position(restored);
+        if restored != requested {
+            save(app, restored);
+        }
     }
 }
 
@@ -65,6 +146,7 @@ pub fn save(app: &AppHandle, pos: PhysicalPosition<i32>) {
 }
 
 /// 拖动结束后检查贴边吸附（Windows：基于显示器工作区，自动避开任务栏）
+#[cfg(not(target_os = "macos"))]
 fn snap_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -135,11 +217,12 @@ fn work_area(window: &tauri::WebviewWindow) -> Option<(i32, i32, i32, i32)> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(target_os = "macos")))]
 fn work_area(_window: &tauri::WebviewWindow) -> Option<(i32, i32, i32, i32)> {
     None
 }
 
+#[cfg(not(target_os = "macos"))]
 pub fn on_event(app: &AppHandle, event: RunEvent) {
     match event {
         RunEvent::WindowEvent {

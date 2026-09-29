@@ -1,0 +1,45 @@
+{
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Capsule Meter",
+        "width": 820,
+        "height": 620,
+        "minWidth": 720,
+        "minHeight": 520,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "decorations": true,
+        "transparent": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": true,
+        "shadow": true,
+        "center": true,
+        "windowEffects": {
+          "effects": ["menu"],
+          "state": "active",
+          "radius": 14
+        }
+      },
+      {
+        "label": "history",
+        "title": "用量历史",
+        "width": 920,
+        "height": 600,
+        "minWidth": 640,
+        "minHeight": 420,
+        "resizable": true,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "url": "history.html",
+        "visible": false,
+        "center": true
+      }
+    ]
+  }
+}

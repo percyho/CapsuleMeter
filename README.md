@@ -39,9 +39,9 @@ A compact desktop widget that displays the remaining usage for the locally authe
   - **Token activity**: A range selector (7/30/90 days, 1 year, all) with KPI cards (total, peak, daily average, active days) and a daily token bar chart.
   - Both tabs offer refresh, **Export CSV** (downloads the local quota samples), and a red **Clear history** button. Retention (7/30/90/365 days) is configurable in the settings panel.
 - **Usage reset credits**: Shows available reset credits and expiration details, with a two-step confirmation before resetting both weekly and 5-hour limits.
-- **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. Notifications can be enabled or disabled with 10%, 20%, or 30% thresholds. The tray icon can use the app logo or dynamic dual usage rings.
+- **Desktop integration**: Includes launch at startup, a system tray, and low-usage notifications. Notifications can be enabled or disabled with 10%, 20%, or 30% thresholds. The tray icon can use the app logo or dynamic dual usage rings. On macOS, Capsule Meter runs as a menu-bar utility without a Dock icon, opens a frosted-glass preferences window, and does not show a separate floating capsule. Close the window to keep the app in the menu bar; use the selector at the top of the window to switch the menu-bar icon.
 - **Consumption speed**: The dots outside the capsule show recent consumption speed: gray = assessing (not enough data), green = slow, blue = normal, orange = fast, and red = critical. The left dot is for the 5-hour window and the right dot is for the weekly window. Hover over the corresponding capsule side to see the estimate.
-- **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default. A new key combination can be recorded directly in System settings, and the shortcut can be disabled.
+- **Custom shortcut**: `Ctrl+Shift+U` shows or hides the capsule by default; on macOS it shows or hides the preferences window. A new key combination can be recorded directly in System settings, and the shortcut can be disabled.
 - **Account information**: Shows the current Codex account below the plan name. The value is read only from local Codex authentication data.
 - **Maintenance tools**: Re-authenticate, run Codex diagnostics, and check Gitee Releases for updates.
 
@@ -61,7 +61,7 @@ A compact desktop widget that displays the remaining usage for the locally authe
 
 - Access, refresh, and ID tokens are used only by the local Rust backend and are **never** exposed to the frontend or a third party. Only the account email extracted locally from the ID token is returned for display in the settings panel.
 - If authentication expires with HTTP 401, run `codex login` or open the Codex app once to refresh the session.
-- Edge snapping uses the Windows monitor work area, automatically avoids the taskbar, and uses a threshold of 24 logical pixels.
+- Edge snapping uses the Windows monitor work area, automatically avoids the taskbar, and uses a threshold of 24 logical pixels. macOS uses a centered settings window instead of restoring a floating capsule position.
 
 ## Common Commands
 
@@ -71,6 +71,12 @@ pnpm install
 
 # Development mode with hot reload
 pnpm tauri dev
+
+# Build a universal macOS .app (Apple Silicon + Intel)
+pnpm build:macos
+
+# Build only for Apple Silicon
+pnpm build:macos:arm64
 
 # Build a Windows NSIS installer and automatically increment the version
 pnpm build:patch   # Patch release: 1.0.1 → 1.0.2
@@ -88,14 +94,23 @@ node scripts/bump-version.js patch   # Or minor / major
 
 ## Release and Build Outputs
 
-The current release is **v1.1.0**. The Windows x64 NSIS installer is produced at:
+The Windows x64 NSIS installer is produced at:
 
 ```text
 Executable:  src-tauri/target/release/capsule-meter.exe
 Installer:   src-tauri/target/release/bundle/nsis/CapsuleMeter_<version>_x64-setup.exe
 ```
 
-The executable and installer are local build artifacts and are not committed to the repository. To publish a release, build the desired version, commit the version changes, create a matching Git tag (for example, `v1.1.0`), and push the commit and tag to the remote repository.
+The macOS build commands produce these app bundles:
+
+```text
+Universal app: src-tauri/target/universal-apple-darwin/release/bundle/macos/CapsuleMeter.app
+Apple Silicon: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/CapsuleMeter.app
+```
+
+Open `CapsuleMeter.app` to run it. Local macOS bundles use ad-hoc signing. Public distribution outside the App Store needs a Developer ID signature and notarization; an ad-hoc build may require allowing the app in macOS Privacy & Security settings.
+
+Executables, app bundles, and installers are local build artifacts and are not committed to the repository. `pnpm build:macos` uses the current version and does not increment it.
 
 ## Project Structure
 
@@ -120,5 +135,6 @@ capsule-meter/
 ## Known Limitations
 
 - A local `~/.codex/auth.json` file is required. Usage cannot be loaded until Codex is authenticated.
+- macOS builds are ad-hoc signed by default. Configure an Apple Developer ID certificate and notarization credentials before distributing downloads publicly.
 - When authentication expires, use **System → Diagnostics & updates** to start `codex login`, then refresh the usage data.
 - Update checks query Gitee Releases. The application never downloads or installs updates automatically in the background.
