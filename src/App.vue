@@ -429,25 +429,81 @@ const rightFillWidth = computed(() => {
 });
 
 // —— 数据刷新 ——
+let interval: number | undefined;
+let refreshRetryTimer: number | undefined;
+let refreshFailureCount = 0;
+let lastSuccessfulRefreshAt = 0;
+let refreshQueued = false;
+
+function scheduleRefreshRetry() {
+  if (refreshRetryTimer) window.clearTimeout(refreshRetryTimer);
+  refreshFailureCount += 1;
+  const delay = Math.min(30_000 * 2 ** (refreshFailureCount - 1), 5 * 60_000);
+  refreshRetryTimer = window.setTimeout(() => {
+    refreshRetryTimer = undefined;
+    void refresh();
+  }, delay);
+}
+
+function refreshIfStale() {
+  if (Date.now() - lastSuccessfulRefreshAt >= 60_000) void refresh();
+}
+
 async function refresh() {
-  if (loading.value) return;
+  if (loading.value) {
+    refreshQueued = true;
+    return;
+  }
+  if (refreshRetryTimer) window.clearTimeout(refreshRetryTimer);
+  refreshRetryTimer = undefined;
   loading.value = true;
-  lastError.value = null;
   try {
-    const data = await invoke<UsageData>("fetch_usage");
+    const result = await invoke<UsageData>("fetch_usage");
+    const data = result.error && usage.value
+      ? {
+          ...result,
+          plan: usage.value.plan,
+          account: usage.value.account,
+          five_hour: usage.value.five_hour,
+          weekly: usage.value.weekly,
+        }
+      : result;
     usage.value = data;
     lastError.value = data.error ?? null;
+    if (data.error) {
+      scheduleRefreshRetry();
+    } else {
+      refreshFailureCount = 0;
+      lastSuccessfulRefreshAt = Date.now();
+      await maybeNotifyLowUsage(data);
+    }
     await updateTrayIcon(data);
-    if (!data.error) await maybeNotifyLowUsage(data);
   } catch (e) {
     lastError.value = String(e);
-    usage.value = null;
+    const emptyWindow: WindowData = {
+      remaining_percent: null,
+      used_percent: null,
+      reset_at: null,
+      reset_after_seconds: null,
+    };
+    usage.value = {
+      plan: usage.value?.plan ?? null,
+      account: usage.value?.account ?? null,
+      five_hour: usage.value?.five_hour ?? emptyWindow,
+      weekly: usage.value?.weekly ?? emptyWindow,
+      error: lastError.value,
+    };
+    scheduleRefreshRetry();
   } finally {
     loading.value = false;
   }
   lastRefresh.value = new Date().toLocaleTimeString("zh-CN", { hour12: false });
   recordHistory();
   void refreshResetCredits();
+  if (refreshQueued) {
+    refreshQueued = false;
+    window.setTimeout(() => void refresh(), 0);
+  }
 }
 
 async function refreshResetCredits() {
@@ -493,7 +549,6 @@ async function consumeResetCredit(creditId: string | null) {
   await refresh();
 }
 
-let interval: number | undefined;
 function restartInterval() {
   if (interval) window.clearInterval(interval);
   interval = window.setInterval(refresh, refreshMin.value * 60 * 1000);
@@ -979,6 +1034,8 @@ onMounted(() => {
   initAutostart();
   refresh();
   restartInterval();
+  window.addEventListener("online", refreshIfStale);
+  document.addEventListener("visibilitychange", refreshIfStale);
   void applyGlobalShortcut().catch((reason) => {
     systemMessage.value = `快捷键注册失败：${String(reason)}`;
   });
@@ -1000,13 +1057,16 @@ onMounted(() => {
   }).then((unlisten) => unlistenEvents.push(unlisten));
   void getCurrentWindow()
     .onFocusChanged(({ payload }) => {
-      if (payload && lastError.value?.includes("登录已过期")) void refresh();
+      if (payload) refreshIfStale();
     })
     .then((unlisten) => unlistenEvents.push(unlisten));
 });
 
 onBeforeUnmount(() => {
   if (interval) window.clearInterval(interval);
+  if (refreshRetryTimer) window.clearTimeout(refreshRetryTimer);
+  window.removeEventListener("online", refreshIfStale);
+  document.removeEventListener("visibilitychange", refreshIfStale);
   if (historyOpenCooldownTimer !== null) {
     window.clearTimeout(historyOpenCooldownTimer);
   }
