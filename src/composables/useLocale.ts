@@ -78,6 +78,7 @@ const en: Record<string, string> = {
   "跟随系统": "System",
   "使用限额重置": "Usage limit reset",
   "完全重置（每周 + 5 小时）": "Full reset (weekly + 5-hour)",
+  "重置每周与 5 小时限额": "Reset weekly and 5-hour limits",
   "无过期时间": "No expiration",
   "获得时间": "Granted",
   "到期时间": "Expires",
@@ -88,6 +89,8 @@ const en: Record<string, string> = {
   "重置卡详情暂不可用": "Reset credit details are unavailable",
   "重置机会列表尚未加载": "Reset credits have not loaded yet",
   "当前没有可用的限额重置机会": "No usage resets are currently available",
+  "读取重置机会失败：": "Failed to load reset credits: ",
+  "；再次确认将安全重试本次操作": "; Confirm again to safely retry this operation",
   "处理中…": "Applying…",
   "确认使用": "Confirm reset",
   "使用重置": "Use reset",
@@ -130,8 +133,31 @@ const en: Record<string, string> = {
   "应用不包含广告、用户追踪或后台遥测。": "The app includes no ads, tracking, or background telemetry.",
 };
 
+// Reset-credit title and description come from Codex and may be returned in
+// English regardless of the language selected in Capsule Meter.
+const resetCreditTextZh: Record<string, string> = {
+  "Full reset": "完全重置（每周 + 5 小时）",
+  "Full reset (weekly + 5-hour)": "完全重置（每周 + 5 小时）",
+  "Full rate limit reset": "完全重置（每周 + 5 小时）",
+  "Reset weekly and five-hour limits": "重置每周与 5 小时限额",
+  "Reset weekly and 5-hour limits": "重置每周与 5 小时限额",
+  "Reset weekly and five-hour usage limits": "重置每周与 5 小时限额",
+  "Resets weekly and five-hour limits": "重置每周与 5 小时限额",
+  "Resets weekly and 5-hour limits": "重置每周与 5 小时限额",
+  "Failed to load reset credits: ": "读取重置机会失败：",
+  "; Confirm again to safely retry this operation": "；再次确认将安全重试本次操作",
+};
+
+const resetCreditTextEn: Record<string, string> = {
+  "完全重置（每周 + 5 小时）": "Full reset (weekly + 5-hour)",
+  "重置每周与 5 小时限额": "Reset weekly and 5-hour limits",
+};
+
 function t(key: string): string {
-  return locale.value === "en-US" ? (en[key] ?? key) : key;
+  if (locale.value === "en-US") {
+    return en[key] ?? resetCreditTextEn[key] ?? key;
+  }
+  return resetCreditTextZh[key] ?? key;
 }
 
 function setLocale(value: AppLocale) {

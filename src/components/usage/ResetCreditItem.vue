@@ -36,9 +36,21 @@ const statusClass = computed(() => {
   if (["redeemed", "used", "consumed"].includes(props.credit.status.toLowerCase())) return "used";
   return "unavailable";
 });
-const title = computed(() =>
-  props.credit.title?.trim() || t("完全重置（每周 + 5 小时）"),
-);
+const title = computed(() => {
+  if (props.credit.resetType.toLowerCase() === "codexratelimits") {
+    return t("完全重置（每周 + 5 小时）");
+  }
+  return props.credit.title?.trim()
+    ? t(props.credit.title.trim())
+    : t("完全重置（每周 + 5 小时）");
+});
+const description = computed(() => {
+  if (!props.credit.description?.trim()) return "";
+  if (props.credit.resetType.toLowerCase() === "codexratelimits") {
+    return t("重置每周与 5 小时限额");
+  }
+  return t(props.credit.description.trim());
+});
 
 function formatDate(epoch: number): string {
   return new Date(epoch * 1000).toLocaleString(locale.value, {
@@ -84,7 +96,7 @@ function requestConsume() {
         {{ loading ? t("处理中…") : confirming ? t("确认使用") : t("使用重置") }}
       </button>
     </div>
-    <p v-if="credit.description" class="reset-description">{{ credit.description }}</p>
+    <p v-if="description" class="reset-description">{{ description }}</p>
     <div class="reset-item-meta">
       <span>{{ t("获得时间") }} · {{ formatDate(credit.grantedAt) }}</span>
       <span>{{ formatExpiry(credit.expiresAt) }}</span>

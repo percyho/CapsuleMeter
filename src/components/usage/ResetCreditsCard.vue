@@ -35,6 +35,22 @@ const countLabel = computed(() =>
     ? `${props.summary?.availableCount ?? 0} available`
     : `可用 ${props.summary?.availableCount ?? 0} 次`,
 );
+const errorMessage = computed(() => {
+  let message = props.error ?? "";
+  const prefix = locale.value === "en-US"
+    ? ["读取重置机会失败：", "Failed to load reset credits: "] as const
+    : ["Failed to load reset credits: ", "读取重置机会失败："] as const;
+  if (message.startsWith(prefix[0])) {
+    message = `${t(prefix[0])}${message.slice(prefix[0].length)}`;
+  }
+  const suffix = locale.value === "en-US"
+    ? ["；再次确认将安全重试本次操作", "; Confirm again to safely retry this operation"] as const
+    : ["; Confirm again to safely retry this operation", "；再次确认将安全重试本次操作"] as const;
+  if (message.endsWith(suffix[0])) {
+    message = `${message.slice(0, -suffix[0].length)}${t(suffix[0])}`;
+  }
+  return message;
+});
 
 function requestFallbackConsume() {
   if (!confirmingFallback.value) {
@@ -76,7 +92,7 @@ function requestFallbackConsume() {
     </div>
 
     <div v-if="expanded && hasResetContent" class="reset-content">
-      <p v-if="error" class="reset-message error" role="alert">{{ error }}</p>
+      <p v-if="errorMessage" class="reset-message error" role="alert">{{ errorMessage }}</p>
       <p v-if="loading && !summary" class="reset-message">{{ t("加载中…") }}</p>
 
       <ResetCreditItem
