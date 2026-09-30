@@ -1,14 +1,13 @@
 const { Readable } = require("node:stream");
 
 const RELEASE_API = "https://api.github.com/repos/percyho/CapsuleMeter/releases/latest";
-const RELEASE_PAGE = "https://github.com/percyho/CapsuleMeter/releases/latest";
 const RELEASE_ASSET_PREFIX = "/percyho/CapsuleMeter/releases/download/";
 
-function redirectToRelease(response) {
-  response.statusCode = 302;
-  response.setHeader("Location", RELEASE_PAGE);
+function unavailable(response) {
+  response.statusCode = 503;
+  response.setHeader("Content-Type", "text/plain; charset=utf-8");
   response.setHeader("Cache-Control", "no-store");
-  response.end();
+  response.end("The latest Windows installer is currently unavailable. Please try again later.");
 }
 
 module.exports = async function downloadLatestWindowsInstaller(request, response) {
@@ -30,7 +29,7 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
     });
 
     if (!releaseResponse.ok) {
-      redirectToRelease(response);
+      unavailable(response);
       return;
     }
 
@@ -42,7 +41,7 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
     );
 
     if (!installer) {
-      redirectToRelease(response);
+      unavailable(response);
       return;
     }
 
@@ -52,14 +51,18 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
       downloadUrl.hostname !== "github.com" ||
       !downloadUrl.pathname.startsWith(RELEASE_ASSET_PREFIX)
     ) {
-      redirectToRelease(response);
+      unavailable(response);
       return;
     }
 
     if (request.method === "HEAD") {
-      response.statusCode = 302;
-      response.setHeader("Location", downloadUrl.href);
+      response.statusCode = 200;
+      response.setHeader("Content-Type", "application/octet-stream");
+      response.setHeader("Content-Disposition", `attachment; filename="${installer.name.replace(/[\\/"\r\n]/g, "_")}"`);
       response.setHeader("Cache-Control", "no-store");
+      if (Number.isFinite(installer.size) && installer.size > 0) {
+        response.setHeader("Content-Length", String(installer.size));
+      }
       response.end();
       return;
     }
@@ -69,7 +72,7 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
     });
 
     if (!installerResponse.ok || !installerResponse.body) {
-      redirectToRelease(response);
+      unavailable(response);
       return;
     }
 
@@ -92,6 +95,6 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
       response.destroy();
       return;
     }
-    redirectToRelease(response);
+    unavailable(response);
   }
 };
