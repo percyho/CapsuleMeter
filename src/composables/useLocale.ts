@@ -76,6 +76,8 @@ const en: Record<string, string> = {
   "跟随系统": "System",
   "使用限额重置": "Usage limit reset",
   "完全重置（每周 + 5 小时）": "Full reset (weekly + 5-hour)",
+  "重置每周和 5 小时限额": "Reset weekly and five-hour limits",
+  "感谢使用 Codex！你已获赠一次免费的速率限制重置机会。": "Thanks for using Codex! You've been granted one free rate limit reset.",
   "无过期时间": "No expiration",
   "获得时间": "Granted",
   "到期时间": "Expires",

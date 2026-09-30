@@ -36,9 +36,28 @@ const statusClass = computed(() => {
   if (["redeemed", "used", "consumed"].includes(props.credit.status.toLowerCase())) return "used";
   return "unavailable";
 });
-const title = computed(() =>
-  props.credit.title?.trim() || t("完全重置（每周 + 5 小时）"),
-);
+const title = computed(() => {
+  const value = props.credit.title?.trim();
+  return value ? t(resetCreditText(value)) : t("完全重置（每周 + 5 小时）");
+});
+const description = computed(() => {
+  const value = props.credit.description?.trim();
+  return value ? t(resetCreditText(value)) : "";
+});
+
+function resetCreditText(value: string): string {
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalized === "full reset" || normalized === "full reset (weekly + 5 hr)" || normalized === "full reset (weekly + 5-hour)") {
+    return "完全重置（每周 + 5 小时）";
+  }
+  if (normalized === "thanks for using codex! you've been granted one free rate limit reset.") {
+    return "感谢使用 Codex！你已获赠一次免费的速率限制重置机会。";
+  }
+  if (normalized === "reset weekly and five-hour limits") {
+    return "重置每周和 5 小时限额";
+  }
+  return value;
+}
 
 function formatDate(epoch: number): string {
   return new Date(epoch * 1000).toLocaleString(locale.value, {
@@ -84,7 +103,7 @@ function requestConsume() {
         {{ loading ? t("处理中…") : confirming ? t("确认使用") : t("使用重置") }}
       </button>
     </div>
-    <p v-if="credit.description" class="reset-description">{{ credit.description }}</p>
+    <p v-if="description" class="reset-description">{{ description }}</p>
     <div class="reset-item-meta">
       <span>{{ t("获得时间") }} · {{ formatDate(credit.grantedAt) }}</span>
       <span>{{ formatExpiry(credit.expiresAt) }}</span>

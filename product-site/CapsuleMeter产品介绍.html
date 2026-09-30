@@ -51,6 +51,19 @@
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .nav-cta{display:inline-flex;align-items:center;gap:8px;background:#303943;color:#fff;font-size:14px;font-weight:600;padding:9px 20px;border-radius:999px;transition:transform .2s,background .2s}
   .nav-cta:hover{transform:translateY(-1px);background:#3a4652}
+  .platform-picker{position:relative;display:inline-flex}
+  .platform-trigger{font:inherit;cursor:pointer}
+  .platform-menu{position:absolute;z-index:70;top:calc(100% + 8px);right:0;min-width:190px;padding:6px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#20252c;box-shadow:0 14px 34px rgba(0,0,0,.38)}
+  .platform-menu[hidden]{display:none}
+  .platform-menu a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink);font-size:14px;white-space:nowrap}
+  .platform-menu a:hover,.platform-menu a:focus-visible{background:rgba(255,255,255,.08);outline:none}
+  .platform-menu small{display:block;color:var(--muted);font-size:11px;line-height:1.4}
+  .platform-caret{width:0;height:0;border:4px solid transparent;border-top-color:currentColor;transform:translateY(2px)}
+  #download .download-actions{flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap}
+  #download .install-download{width:min(400px,100%)}
+  #download .mac-download{width:min(400px,100%);min-height:72px;border-radius:15px;background:transparent;color:#d8dde5;font-size:18px;border:1px solid rgba(255,255,255,.16)}
+  #download .mac-download:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.28);transform:translateY(-1px)}
+  #download .mac-download svg{width:22px;height:22px;fill:currentColor;stroke:none}
   a[href="/download"]{position:relative;isolation:isolate;overflow:hidden}
   a[href="/download"] .download-progress{position:absolute;z-index:0;inset:0 auto 0 0;width:var(--download-progress,0%);border-radius:inherit;background:#050607;transition:width .12s linear;pointer-events:none}
   a[href="/download"] .download-progress.is-indeterminate{width:36%;animation:download-progress-indeterminate 1.15s ease-in-out infinite}
@@ -379,10 +392,13 @@
         <svg data-animated-icon data-animation="earth" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"/><path d="M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"/><path d="M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"/><circle cx="12" cy="12" r="10"/></svg>
         <span class="lang-label">EN</span>
       </button>
-      <a class="nav-cta" href="/download">
-        <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
-        <span data-download-label>下载</span>
-      </a>
+      <div class="platform-picker">
+        <button class="nav-cta platform-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-download-menu"><span data-download-label>下载</span><i class="platform-caret" aria-hidden="true"></i></button>
+        <div class="platform-menu" id="nav-download-menu" role="menu" hidden>
+          <a role="menuitem" href="/download" data-platform="windows" data-zh="下载 Windows 版" data-en="Download for Windows">下载 Windows 版</a>
+          <a role="menuitem" href="https://github.com/percyho/CapsuleMeter/releases/latest" target="_blank" rel="noopener noreferrer" data-platform="mac" data-zh="查看 macOS 版本" data-en="View macOS releases"><span><span data-zh="查看 macOS 版本" data-en="View macOS releases">查看 macOS 版本</span><small data-zh="当前暂无 macOS 安装包" data-en="No macOS installer yet">当前暂无 macOS 安装包</small></span></a>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -395,11 +411,16 @@
       <h1>你的 <span class="ind">Codex</span> 用量，<br>一眼尽收</h1>
       <p class="lead">一个悬浮在桌角的胶囊小部件，实时显示本机 Codex CLI 登录账号的 5 小时与每周用量剩余。无边框、可贴边、可换肤，历史数据只存本地。</p>
       <div class="hero-ctas">
-        <a class="btn primary install-download" data-icon-trigger href="/download">
-          <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
+        <div class="platform-picker">
+        <button class="btn primary install-download platform-trigger" data-icon-trigger type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="hero-download-menu">
           <svg data-animated-icon data-animation="download" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><g class="download-arrow"><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></g></svg>
-          <span data-download-label>立即下载</span>
-        </a>
+          <span data-download-label>立即下载</span><i class="platform-caret" aria-hidden="true"></i>
+        </button>
+        <div class="platform-menu" id="hero-download-menu" role="menu" hidden>
+          <a role="menuitem" href="/download" data-platform="windows" data-zh="下载 Windows 版" data-en="Download for Windows">下载 Windows 版</a>
+          <a role="menuitem" href="https://github.com/percyho/CapsuleMeter/releases/latest" target="_blank" rel="noopener noreferrer" data-platform="mac"><span><span data-zh="查看 macOS 版本" data-en="View macOS releases">查看 macOS 版本</span><small data-zh="当前暂无 macOS 安装包" data-en="No macOS installer yet">当前暂无 macOS 安装包</small></span></a>
+        </div>
+        </div>
         <a class="btn ghost feature-preview" data-icon-trigger href="#features">
           <svg data-animated-icon data-animation="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
           <span>查看功能特性</span>
@@ -634,6 +655,10 @@
         <svg class="windows-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4.1 10.5 2.9v8H2V4.1Zm10-1.4L22 1v9.9H12V2.7ZM2 12.1h8.5v8L2 18.9v-6.8Zm10 0h10V22l-10-1.4v-8.5Z"/></svg>
         <span data-download-label>下载 Windows 安装包</span>
       </a>
+      <a class="btn mac-download" href="https://github.com/percyho/CapsuleMeter/releases/latest" target="_blank" rel="noopener noreferrer" data-zh="查看 macOS 版本" data-en="View macOS releases">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 1.43c0 1.14-.42 2.24-1.17 3.07-.8.87-2.1 1.54-3.24 1.45-.15-1.1.4-2.3 1.14-3.1.8-.87 2.2-1.5 3.27-1.42ZM20.9 17.55c-.47 1.08-.7 1.56-1.3 2.51-.84 1.3-2.02 2.92-3.48 2.93-1.3.01-1.64-.85-3.4-.84-1.75.01-2.13.86-3.43.85-1.46-.02-2.58-1.47-3.42-2.77-2.35-3.64-2.6-7.9-1.15-10.18 1.03-1.62 2.66-2.57 4.2-2.57 1.57 0 2.56.86 3.86.86 1.26 0 2.03-.86 3.84-.86 1.37 0 2.83.75 3.86 2.05-3.4 1.87-2.85 6.72.42 8.02Z"/></svg>
+        <span data-zh="查看 macOS 版本" data-en="View macOS releases">查看 macOS 版本</span>
+      </a>
       <a class="btn ghost github-source" data-icon-trigger href="https://github.com/percyho/CapsuleMeter" target="_blank" rel="noopener">
         <svg data-animated-icon viewBox="0 0 24 24" aria-hidden="true"><path class="github-body" d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path class="github-tail" d="M9 18c-4.51 2-5-2-7-2"/></svg>
         <span>查看源码 · GitHub</span>
@@ -663,7 +688,7 @@
     var language=savedChoice||countryCookie||browserLanguage;
     var translations={
       en:{
-        'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','header .nav-cta [data-download-label]':'Download',
+        'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','header .nav-cta [data-download-label]':'Download','[data-platform="windows"]':'Download for Windows','[data-platform="mac"]':'View macOS releases','#nav-download-menu small':'No macOS installer yet','#hero-download-menu small':'No macOS installer yet',
         '.eyebrow span':'Windows desktop usage widget','.hero h1':'Your <span class="ind">Codex</span> usage,<br>at a glance','.hero p.lead':'A small capsule widget that floats in the corner of your desktop, showing the signed-in Codex CLI account’s remaining 5-hour and weekly usage in real time. Borderless, edge-snapping, and customizable, with history stored locally.',
         '#top .hero-ctas .btn.primary [data-download-label]':'Download now','#top .hero-ctas .btn.ghost span':'Explore features',
         '.demo-dots .dd:nth-child(1) span':'Steady usage','.demo-dots .dd:nth-child(2) span':'Fast usage','.demo-hint':'Click either side to view its reset time. It returns to the usage value after 5 seconds','#demoThemePrefix':'Capsule preview ·',
@@ -683,7 +708,7 @@
         'body > section.sec:nth-of-type(6) .sec-head .kicker':'USAGE SPEED','body > section.sec:nth-of-type(6) .sec-head h2':'Colored dots show how quickly usage is changing','body > section.sec:nth-of-type(6) .sec-head p':'The dots on either side of the capsule correspond to the 5-hour and weekly limits. Their colors reflect recent usage speed; hover for an estimate.',
         '.sp.gray b':'Gray','.sp.gray span':'Evaluating · Not enough data','.sp.green b':'Green','.sp.green span':'Steady usage','.sp.blue b':'Blue','.sp.blue span':'Normal usage','.sp.orange b':'Orange','.sp.orange span':'Fast usage','.sp.red b':'Red','.sp.red span':'Very fast usage',
         '#privacy h3':'Privacy commitment','#privacy .priv li:nth-child(1)':'<b>Tokens stay on your device</b> — Access, refresh, and ID tokens are used only by the local Rust backend. They are never exposed to the frontend or third parties.','#privacy .priv li:nth-child(2)':'<b>Only the account email is shown</b> — The email is read locally from the ID token. No other sensitive information is displayed.','#privacy .priv li:nth-child(3)':'<b>History stays on your device</b> — Usage samples are stored locally. Export them or clear them at any time.',
-        '#download h2':'Keep usage in the corner and focus on your code','#download p':'Supports launch at startup, the system tray, and a live dual-window usage display. <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT License</a>.','#download .btn.primary [data-download-label]':'Download for Windows','#download .btn.ghost span':'View source · GitHub',
+        '#download h2':'Keep usage in the corner and focus on your code','#download p':'Supports launch at startup, the system tray, and a live dual-window usage display. <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT License</a>.','#download .btn.primary [data-download-label]':'Download for Windows','#download .mac-download':'View macOS releases','#download .btn.ghost span':'View source · GitHub',
         '.foot-links a:nth-child(1)':'Features','.foot-links a:nth-child(2)':'History','.foot-links a:nth-child(3)':'Themes','.foot-links a:nth-child(4)':'Privacy','footer .foot-in > span':'© 2026 Capsule Meter · Windows x64'
       }
     };
@@ -1045,6 +1070,21 @@
       e.preventDefault();el.scrollIntoView({behavior:'smooth'});
     });
   });
+
+  // Platform download menus
+  (function(){
+    var pickers=Array.from(document.querySelectorAll('.platform-picker'));
+    function closePicker(picker){var trigger=picker.querySelector('.platform-trigger'),menu=picker.querySelector('.platform-menu');menu.hidden=true;trigger.setAttribute('aria-expanded','false');}
+    pickers.forEach(function(picker){
+      var trigger=picker.querySelector('.platform-trigger'),menu=picker.querySelector('.platform-menu');
+      trigger.addEventListener('click',function(){var opening=menu.hidden;pickers.forEach(closePicker);if(opening){menu.hidden=false;trigger.setAttribute('aria-expanded','true');}});
+      menu.addEventListener('click',function(event){if(event.target.closest('a'))closePicker(picker);});
+      trigger.addEventListener('keydown',function(event){if(event.key==='ArrowDown'){event.preventDefault();menu.hidden=false;trigger.setAttribute('aria-expanded','true');var first=menu.querySelector('a');if(first)first.focus();}});
+      menu.addEventListener('keydown',function(event){var links=Array.from(menu.querySelectorAll('a')),index=links.indexOf(document.activeElement);if(event.key==='Escape'){closePicker(picker);trigger.focus();}else if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();links[(index+(event.key==='ArrowDown'?1:links.length-1))%links.length].focus();}});
+    });
+    document.addEventListener('click',function(event){if(!event.target.closest('.platform-picker'))pickers.forEach(closePicker);});
+    document.addEventListener('keydown',function(event){if(event.key==='Escape')pickers.forEach(closePicker);});
+  })();
 
   // Stream the installer through the same-origin Netlify endpoint so the page can show byte-level progress.
   (function(){
