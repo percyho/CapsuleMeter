@@ -44,6 +44,8 @@ let resizeObserver: ResizeObserver | null = null;
 let renderTimer: ReturnType<typeof setTimeout> | null = null;
 let requestSequence = 0;
 let unlistenHistoryShown: UnlistenFn | null = null;
+let unlistenWindowFocus: UnlistenFn | null = null;
+let unlistenWindowResized: UnlistenFn | null = null;
 const { toggleMaximizeWindow } = useWindowControls();
 useUiTheme({ syncAcrossWindows: true, onChange: () => scheduleRender(0) });
 
@@ -94,9 +96,29 @@ async function loadTokens() {
 function emptyGraphic(text: string, color: string) {
   return { type: "text", left: "center", top: "middle", style: { text, fill: color, fontSize: 13 } };
 }
+function waitForLayout() {
+  return new Promise<void>(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+async function resizeAndRenderChart() {
+  await nextTick();
+  await waitForLayout();
+  const element = chartElement.value;
+  if (!element) return;
+  const { width, height } = element.getBoundingClientRect();
+  if (width <= 0 || height <= 0) return;
+  if (!chart) chart = init(element);
+  chart.resize({ width, height });
+  renderChart();
+}
 function renderChart() {
-  if (!chart) return;
-  const styles = chartElement.value ? getComputedStyle(chartElement.value) : null;
+  const element = chartElement.value;
+  if (!element) return;
+  const { width, height } = element.getBoundingClientRect();
+  if (width <= 0 || height <= 0) return;
+  if (!chart) chart = init(element);
+  const styles = getComputedStyle(element);
   const text = styles?.getPropertyValue("--text-secondary").trim() || "#8c8c92";
   const grid = styles?.getPropertyValue("--chart-grid").trim() || "rgba(128,128,128,.14)";
   const tooltip = { trigger: "axis", backgroundColor: "rgba(28,32,42,.96)", borderColor: grid, textStyle: { color: "#f5f7fb", fontSize: 12 } };
@@ -116,7 +138,7 @@ function renderChart() {
     tooltip: { ...tooltip, formatter: (params: unknown) => { const item = (params as Array<{ value: [number, number] }>)[0]; return item ? `${new Date(item.value[0]).toLocaleString("zh-CN", { hour12: false })}<br/><strong>剩余 ${Math.round(item.value[1])}%</strong>` : ""; } },
     xAxis: { type: "time", axisLine: { lineStyle: { color: grid } }, axisTick: { show: false }, axisLabel: { color: text, fontSize: 11, hideOverlap: true }, splitLine: { show: false } },
     yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: text, fontSize: 11, formatter: "{value}%" }, splitLine: { lineStyle: { color: grid } } },
-    series: points.length ? [{ name: "剩余额度", type: "line", data: points.map(point => [point.time, point.value]), showSymbol: points.length === 1, symbolSize: 7, smooth: .22, lineStyle: { color: "#0a84ff", width: 2 }, areaStyle: { color: "rgba(10,132,255,.14)" } }] : [],
+    series: points.length ? [{ name: "剩余额度", type: "line", data: points.map(point => [point.time, point.value]), showSymbol: true, symbolSize: 4, smooth: .22, lineStyle: { color: "#0a84ff", width: 2 }, areaStyle: { color: "rgba(10,132,255,.14)" } }] : [],
     graphic: points.length ? [] : [emptyGraphic(refreshing.value ? "正在加载额度历史…" : quotaError.value ? "额度数据不可用" : "当前范围还没有额度记录", text)],
   }, { notMerge: true });
 }
@@ -137,14 +159,12 @@ async function refreshQuotaHistory(): Promise<boolean> {
     return false;
   } finally {
     refreshing.value = false;
-    await nextTick();
-    chart?.resize();
+    await resizeAndRenderChart();
     scheduleRender(0);
   }
 }
 async function onHistoryWindowShown() {
-  await nextTick();
-  chart?.resize();
+  await resizeAndRenderChart();
   await Promise.all([refreshQuotaHistory(), loadTokens()]);
 }
 async function refreshHistory() {
@@ -186,13 +206,26 @@ watch(tab, async () => { await nextTick(); scheduleRender(0); });
 watch([quotaWindow, quotaRange], () => scheduleRender());
 watch(tokenRange, () => void loadTokens());
 onMounted(async () => {
-  if (chartElement.value) { chart = init(chartElement.value); resizeObserver = new ResizeObserver(() => chart?.resize()); resizeObserver.observe(chartElement.value); }
-  renderChart();
+  if (chartElement.value) {
+    resizeObserver = new ResizeObserver(entries => {
+      const { width, height } = entries[0]?.contentRect ?? { width: 0, height: 0 };
+      if (width <= 0 || height <= 0) return;
+      if (!chart && chartElement.value) chart = init(chartElement.value);
+      chart?.resize({ width, height });
+      scheduleRender(0);
+    });
+    resizeObserver.observe(chartElement.value);
+  }
   unlistenHistoryShown = await listen("history-window-shown", () => void onHistoryWindowShown());
-  if (await getCurrentWindow().isVisible()) void onHistoryWindowShown();
+  const currentWindow = getCurrentWindow();
+  unlistenWindowFocus = await currentWindow.onFocusChanged(({ payload: focused }) => {
+    if (focused) void resizeAndRenderChart();
+  });
+  unlistenWindowResized = await currentWindow.onResized(() => void resizeAndRenderChart());
+  if (await currentWindow.isVisible()) void onHistoryWindowShown();
   await loadTokens();
 });
-onBeforeUnmount(() => { requestSequence += 1; unlistenHistoryShown?.(); if (renderTimer) clearTimeout(renderTimer); resizeObserver?.disconnect(); chart?.dispose(); chart = null; });
+onBeforeUnmount(() => { requestSequence += 1; unlistenHistoryShown?.(); unlistenWindowFocus?.(); unlistenWindowResized?.(); if (renderTimer) clearTimeout(renderTimer); resizeObserver?.disconnect(); chart?.dispose(); chart = null; });
 </script>
 
 <template>
