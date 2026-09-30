@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { BarChart, LineChart } from "echarts/charts";
-import { GraphicComponent, GridComponent, TooltipComponent } from "echarts/components";
+import { DataZoomComponent, GraphicComponent, GridComponent, TooltipComponent } from "echarts/components";
 import { init, use, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { invoke } from "@tauri-apps/api/core";
@@ -9,7 +9,7 @@ import type { HistoryPoint } from "../../types/usage";
 import { compactNumber } from "../../utils/formatters";
 import { useLocale } from "../../composables/useLocale";
 
-use([BarChart, LineChart, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
+use([BarChart, LineChart, DataZoomComponent, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
 const { locale, t } = useLocale();
 
 interface DailyUsage {
@@ -135,6 +135,7 @@ function renderChart() {
     chart.setOption({
       animation: false,
       grid: { left: 38, right: 10, top: 18, bottom: 28 },
+      dataZoom: [{ type: "inside", xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseWheel: false, moveOnMouseMove: true }],
       tooltip: { ...tooltip, valueFormatter: (value: unknown) => `${Math.round(Number(value))}%` },
       xAxis: {
         type: "time",
@@ -182,6 +183,7 @@ function renderChart() {
   chart.setOption({
     animation: false,
     grid: { left: 44, right: 10, top: 18, bottom: 28 },
+    dataZoom: [{ type: "inside", xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseWheel: false, moveOnMouseMove: true }],
     tooltip: { ...tooltip, valueFormatter: (value: unknown) => compactNumber(Number(value)) },
     xAxis: {
       type: "category",

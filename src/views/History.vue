@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { BarChart, LineChart } from "echarts/charts";
-import { GraphicComponent, GridComponent, TooltipComponent } from "echarts/components";
+import { DataZoomComponent, GraphicComponent, GridComponent, TooltipComponent } from "echarts/components";
 import { init, use, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { invoke } from "@tauri-apps/api/core";
@@ -15,7 +15,7 @@ import { useWindowControls } from "../composables/useWindowControls";
 import type { UsageData } from "../types/usage";
 import { compactNumber } from "../utils/formatters";
 
-use([BarChart, LineChart, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
+use([BarChart, LineChart, DataZoomComponent, GraphicComponent, GridComponent, TooltipComponent, CanvasRenderer]);
 
 interface DailyUsage { date?: string; tokens?: number }
 interface AnalyticsData { daily: DailyUsage[]; total_tokens: number | null; peak_tokens: number | null; error: string | null }
@@ -125,6 +125,7 @@ function renderChart() {
   if (tab.value === "tokens") {
     const values = tokenValues.value;
     chart.setOption({ animationDuration: 220, grid: { left: 58, right: 20, top: 24, bottom: 38 },
+      dataZoom: [{ type: "inside", xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseWheel: false, moveOnMouseMove: true }],
       tooltip: { ...tooltip, valueFormatter: (value: unknown) => compactNumber(Number(value)) },
       xAxis: { type: "category", data: values.map(item => item.date?.slice(5) ?? ""), axisLine: { lineStyle: { color: grid } }, axisTick: { show: false }, axisLabel: { color: text, fontSize: 11, hideOverlap: true } },
       yAxis: { type: "value", axisLabel: { color: text, fontSize: 11, formatter: (value: number) => compactNumber(value) }, splitLine: { lineStyle: { color: grid } } },
@@ -135,6 +136,7 @@ function renderChart() {
   }
   const points = filteredQuotaPoints.value;
   chart.setOption({ animationDuration: 220, grid: { left: 52, right: 20, top: 24, bottom: 38 },
+    dataZoom: [{ type: "inside", xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseWheel: false, moveOnMouseMove: true }],
     tooltip: { ...tooltip, formatter: (params: unknown) => { const item = (params as Array<{ value: [number, number] }>)[0]; return item ? `${new Date(item.value[0]).toLocaleString("zh-CN", { hour12: false })}<br/><strong>剩余 ${Math.round(item.value[1])}%</strong>` : ""; } },
     xAxis: { type: "time", axisLine: { lineStyle: { color: grid } }, axisTick: { show: false }, axisLabel: { color: text, fontSize: 11, hideOverlap: true }, splitLine: { show: false } },
     yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: text, fontSize: 11, formatter: "{value}%" }, splitLine: { lineStyle: { color: grid } } },
