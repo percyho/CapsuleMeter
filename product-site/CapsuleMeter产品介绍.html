@@ -1148,8 +1148,6 @@
   // Platform download menus
   (function(){
     var pickers=Array.from(document.querySelectorAll('.platform-picker'));
-    var releaseApi='https://api.github.com/repos/percyho/CapsuleMeter/releases/latest';
-    var releaseAssetPrefix='/percyho/CapsuleMeter/releases/download/';
     var notice,noticeTimer;
     function closePicker(picker){var trigger=picker.querySelector('.platform-menu-trigger'),menu=picker.querySelector('.platform-menu');menu.hidden=true;trigger.setAttribute('aria-expanded','false');}
     function showDownloadNotice(message){
@@ -1171,21 +1169,19 @@
     async function downloadLatestMac(){
       showDownloadNotice(isEnglishText()?'Checking for the latest macOS installer…':'正在查找最新 macOS 安装包…');
       try{
-        var response=await fetch(releaseApi,{headers:{accept:'application/vnd.github+json'},cache:'no-store'});
-        if(!response.ok)throw new Error('release unavailable');
-        var release=await response.json(),assets=(release.assets||[]).filter(function(asset){return asset&&typeof asset.name==='string'&&typeof asset.browser_download_url==='string'&&(/\.(dmg|pkg|zip)$/i.test(asset.name)||/\.app\.tar\.gz$/i.test(asset.name));});
-        if(!assets.length){showDownloadNotice(isEnglishText()?'No macOS installer is available in the latest release yet.':'最新版本暂未提供 macOS 安装包。');return;}
-        function assetArchitecture(asset){var name=asset.name.toLowerCase();if(/universal|universal2/.test(name))return 'universal';if(/aarch64|arm64/.test(name))return 'arm';if(/x86_64|x64|amd64/.test(name))return 'x64';return null;}
-        function packageRank(asset){var name=asset.name.toLowerCase();if(name.endsWith('.dmg'))return 0;if(name.endsWith('.pkg'))return 1;if(name.endsWith('.zip'))return 2;return 3;}
-        assets.sort(function(a,b){return packageRank(a)-packageRank(b);});
-        var installer=assets.find(function(asset){return assetArchitecture(asset)==='universal';});
-        if(!installer&&assets.length===1)installer=assets[0];
-        if(!installer){var architecture=await detectedMacArchitecture();if(architecture)installer=assets.find(function(asset){return assetArchitecture(asset)===architecture;});}
-        if(!installer){showDownloadNotice(isEnglishText()?'Could not determine which macOS installer matches this Mac.':'无法确定适用于这台 Mac 的安装包。');return;}
-        var url=new URL(installer.browser_download_url);
-        if(url.protocol!=='https:'||url.hostname!=='github.com'||!url.pathname.startsWith(releaseAssetPrefix))throw new Error('unexpected installer URL');
+        var architecture=await detectedMacArchitecture()||'unknown';
+        var endpoint=window.location.protocol==='file:'?'https://capsule-meter-product-preview.netlify.app/download':'/download';
+        var response=await fetch(endpoint+'?platform=mac&arch='+encodeURIComponent(architecture),{cache:'no-store'});
+        if(response.status===404){showDownloadNotice(isEnglishText()?'No compatible macOS installer is available in the latest release.':'最新发布中没有适用于这台 Mac 的安装包。');return;}
+        var contentType=(response.headers.get('content-type')||'').toLowerCase();
+        if(!response.ok||!response.body||contentType.indexOf('application/octet-stream')===-1)throw new Error('macOS download unavailable');
+        var disposition=response.headers.get('content-disposition')||'',match=disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i),filename='CapsuleMeter-macOS-installer.dmg';
+        if(match){try{filename=decodeURIComponent(match[1]||match[2]);}catch(_){filename=match[1]||match[2];}}
+        filename=filename.replace(/[\\/:*?"<>|]/g,'_');
+        var blob=await response.blob(),objectUrl=URL.createObjectURL(blob),anchor=document.createElement('a');
+        anchor.href=objectUrl;anchor.download=filename;anchor.hidden=true;document.body.appendChild(anchor);anchor.click();anchor.remove();
+        window.setTimeout(function(){URL.revokeObjectURL(objectUrl);},60000);
         showDownloadNotice(isEnglishText()?'Starting the latest macOS download…':'正在启动最新 macOS 版本下载…');
-        window.location.assign(url.href);
       }catch(_){showDownloadNotice(isEnglishText()?'Could not retrieve the latest macOS installer. Please try again later.':'暂时无法获取最新 macOS 安装包，请稍后重试。');}
     }
     function isEnglishText(){return window.capsuleSiteLanguage&&window.capsuleSiteLanguage()==='en';}
