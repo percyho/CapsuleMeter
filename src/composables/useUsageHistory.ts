@@ -19,6 +19,13 @@ export function useUsageHistory(options: { syncAcrossWindows?: boolean; onChange
     historyPoints.value = readUsageHistory();
   }
 
+  function pruneHistory(retentionDays: number) {
+    const days = Number.isFinite(retentionDays) ? Math.max(7, retentionDays) : 30;
+    const cutoff = Date.now() - days * 86_400_000;
+    historyPoints.value = historyPoints.value.filter((point) => point.t > cutoff);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(historyPoints.value));
+  }
+
   function appendUsage(usage: UsageData, timestamp = Date.now()) {
     const retentionDays = Math.max(7, Number(localStorage.getItem("historyRetentionDays") ?? "30"));
     const retentionMs = retentionDays * 86_400_000;
@@ -50,5 +57,5 @@ export function useUsageHistory(options: { syncAcrossWindows?: boolean; onChange
   });
   onBeforeUnmount(() => window.removeEventListener("storage", onStorage));
 
-  return { historyPoints, reloadHistory, appendUsage, clearHistory };
+  return { historyPoints, reloadHistory, appendUsage, pruneHistory, clearHistory };
 }

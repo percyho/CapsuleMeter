@@ -119,6 +119,7 @@ type CapsuleWidgetSettings = {
   capsuleColors: CapsuleColorValues;
   capsuleThemeColors: CapsuleThemeColorOverrides;
   displayMode: string;
+  resetShowSec: number;
   showUsageValues: boolean;
   fontSize: number;
   opacity: number;
@@ -195,6 +196,7 @@ function syncCapsuleWidgetSettings() {
     capsuleColors: { ...capsuleColors },
     capsuleThemeColors: JSON.parse(JSON.stringify(capsuleThemeColors)),
     displayMode: displayMode.value,
+    resetShowSec: resetShowSec.value,
     showUsageValues: showUsageValues.value,
     fontSize: fontSize.value,
     opacity: opacity.value,
@@ -220,7 +222,7 @@ const rightFillColorStyle = computed(() =>
 const { uiTheme, applyTheme, setUiTheme } = useUiTheme();
 const { locale, setLocale, t } = useLocale();
 const activeTab = ref("appearance");
-const { historyPoints, appendUsage } = useUsageHistory({
+const { historyPoints, appendUsage, pruneHistory } = useUsageHistory({
   syncAcrossWindows: true,
 });
 function recordHistory() {
@@ -757,6 +759,7 @@ function onRetentionChange() {
     "historyRetentionDays",
     String(historyRetentionDays.value),
   );
+  pruneHistory(historyRetentionDays.value);
 }
 
 async function startLogin() {
@@ -919,6 +922,11 @@ function onShowUsageValuesChange() {
 
 function onResetShowSecChange() {
   localStorage.setItem("resetShowSec", String(resetShowSec.value));
+  restartResetDisplayTimers();
+  syncCapsuleWidgetSettings();
+}
+
+function restartResetDisplayTimers() {
   // 若正在显示重置时间，立即用新时长重新计时
   if (showLeftReset.value) {
     clearTimer("left");
@@ -1196,6 +1204,8 @@ onMounted(async () => {
       Object.assign(capsuleColors, payload.capsuleColors);
       Object.assign(capsuleThemeColors, payload.capsuleThemeColors);
       displayMode.value = payload.displayMode;
+      resetShowSec.value = payload.resetShowSec;
+      restartResetDisplayTimers();
       showUsageValues.value = payload.showUsageValues;
       fontSize.value = payload.fontSize;
       opacity.value = payload.opacity;
@@ -1670,7 +1680,7 @@ onBeforeUnmount(() => {
               <span class="knob"></span>
             </button>
           </div>
-          <div v-if="!isMacOS" class="row">
+          <div class="row">
             <span class="row-name">{{ t("显示模式") }}</span>
             <div class="seg">
               <button
@@ -1693,7 +1703,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <div v-if="!isMacOS" class="row">
+          <div class="row">
             <span class="row-name">{{ t("重置显示时长") }}</span>
             <select
               v-model.number="resetShowSec"

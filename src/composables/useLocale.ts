@@ -85,6 +85,8 @@ const en: Record<string, string> = {
   "可用": "Available",
   "已使用": "Used",
   "已过期": "Expired",
+  "有效期已过": "Expired",
+  "离有效期不到1天": "Less than 1 day left",
   "不可用": "Unavailable",
   "重置卡详情暂不可用": "Reset credit details are unavailable",
   "重置机会列表尚未加载": "Reset credits have not loaded yet",
