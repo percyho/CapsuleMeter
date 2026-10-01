@@ -1157,6 +1157,14 @@
       noticeTimer=window.setTimeout(function(){notice.hidden=true;},6000);
     }
     window.capsuleShowDownloadNotice=showDownloadNotice;
+    var releasesApi='https://api.github.com/repos/percyho/CapsuleMeter/releases?per_page=100';
+    function stableReleases(releases){return (Array.isArray(releases)?releases:[]).filter(function(release){return release&&!release.draft&&!release.prerelease&&Array.isArray(release.assets);}).sort(function(a,b){return Date.parse(b.published_at||b.created_at||0)-Date.parse(a.published_at||a.created_at||0);});}
+    function isMacAsset(asset){if(!asset||typeof asset.name!=='string'||typeof asset.browser_download_url!=='string')return false;var name=asset.name.toLowerCase();return /\.(dmg|pkg)$/i.test(name)||/\.app\.tar\.gz$/i.test(name)||(/\.zip$/i.test(name)&&/mac|macos|osx|darwin|arm64|aarch64|x64|x86_64|universal/i.test(name));}
+    function macAssetArchitecture(asset){var name=asset.name.toLowerCase();if(/universal2?|universal-/.test(name))return 'universal';if(/aarch64|arm64/.test(name))return 'arm';if(/x86_64|x64|amd64/.test(name))return 'x64';return 'any';}
+    function latestWindowsAsset(releases){for(var release of releases){var asset=release.assets.find(function(item){return typeof item.name==='string'&&item.name.toLowerCase().endsWith('_x64-setup.exe')&&typeof item.browser_download_url==='string';});if(asset)return asset;}return null;}
+    function latestMacAsset(releases,architecture){for(var release of releases){var assets=release.assets.filter(isMacAsset).sort(function(a,b){function rank(item){var name=item.name.toLowerCase();return name.endsWith('.dmg')?0:name.endsWith('.pkg')?1:name.endsWith('.zip')?2:3;}return rank(a)-rank(b);});var universal=assets.find(function(asset){return macAssetArchitecture(asset)==='universal';});var matching=architecture&&architecture!=='unknown'?assets.find(function(asset){return macAssetArchitecture(asset)===architecture;}):null;var generic=assets.find(function(asset){return macAssetArchitecture(asset)==='any';});if(universal||matching||generic)return universal||matching||generic;}return null;}
+    async function findLatestInstaller(platform,architecture){var response=await fetch(releasesApi,{headers:{accept:'application/vnd.github+json'},cache:'no-store'});if(!response.ok)throw new Error('Could not load GitHub releases');var releases=stableReleases(await response.json()),installer=platform==='mac'?latestMacAsset(releases,architecture):latestWindowsAsset(releases);if(!installer||typeof installer.browser_download_url!=='string')return null;var url=new URL(installer.browser_download_url);if(url.protocol!=='https:'||url.hostname!=='github.com'||url.pathname.indexOf('/percyho/CapsuleMeter/releases/download/')!==0)return null;return installer;}
+    window.capsuleFindLatestInstaller=findLatestInstaller;
     async function detectedMacArchitecture(){
       var value='';
       try{if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){var hints=await navigator.userAgentData.getHighEntropyValues(['architecture']);value=hints.architecture||'';}}catch(_){}
@@ -1170,7 +1178,14 @@
       showDownloadNotice(isEnglishText()?'Checking for the latest macOS installer…':'正在查找最新 macOS 安装包…');
       try{
         var architecture=await detectedMacArchitecture()||'unknown';
-        var endpoint=window.location.protocol==='file:'?'https://capsule-meter-product-preview.netlify.app/download':'/download';
+        if(window.location.protocol==='file:'){
+          var localInstaller=await findLatestInstaller('mac',architecture);
+          if(!localInstaller){showDownloadNotice(isEnglishText()?'No compatible macOS installer is available in the latest releases.':'最新发布中没有适用于这台 Mac 的安装包。');return;}
+          window.location.assign(localInstaller.browser_download_url);
+          showDownloadNotice(isEnglishText()?'Starting the latest macOS download…':'正在启动最新 macOS 版本下载…');
+          return;
+        }
+        var endpoint='/download';
         var response=await fetch(endpoint+'?platform=mac&arch='+encodeURIComponent(architecture),{cache:'no-store'});
         if(response.status===404){showDownloadNotice(isEnglishText()?'No compatible macOS installer is available in the latest release.':'最新发布中没有适用于这台 Mac 的安装包。');return;}
         var contentType=(response.headers.get('content-type')||'').toLowerCase();
@@ -1200,7 +1215,7 @@
     document.addEventListener('keydown',function(event){if(event.key==='Escape')pickers.forEach(closePicker);});
   })();
 
-  // Stream the installer through the same-origin Netlify endpoint so the page can show byte-level progress.
+  // Stream the installer through the same-origin or Netlify endpoint so the page can show byte-level progress.
   (function(){
     var downloadLinks=Array.from(document.querySelectorAll('a[href="/download"]'));
     if(!downloadLinks.length)return;
@@ -1270,6 +1285,13 @@
       else window.alert(noticeText);
     }
     async function download(link){
+      if(window.location.protocol==='file:'){
+        var localInstaller=await window.capsuleFindLatestInstaller('windows','unknown');
+        if(!localInstaller)throw new Error('No Windows installer is available in the latest releases');
+        setState(link,'fallback',0);
+        window.location.assign(localInstaller.browser_download_url);
+        return;
+      }
       var response=await getProgressResponse();
       var total=Number(response.headers.get('content-length'))||0,loaded=0,reader=response.body.getReader(),chunks=[];
       setState(link,'downloading',total?0:null);

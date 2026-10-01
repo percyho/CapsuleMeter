@@ -2316,7 +2316,7 @@ body {
 
 .tabs {
   display: flex;
-  flex: 0 0 92px;
+  flex: 0 0 max-content;
   flex-direction: column;
   gap: 2px;
   padding: 10px 8px;
@@ -2330,6 +2330,7 @@ body {
   gap: 8px;
   min-width: 0;
   padding: 8px 9px;
+  white-space: nowrap;
   border: none;
   background: transparent;
   color: var(--panel-val, #7f8799);

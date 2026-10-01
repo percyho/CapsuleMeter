@@ -81,6 +81,8 @@ const en: Record<string, string> = {
   "无过期时间": "No expiration",
   "获得时间": "Granted",
   "到期时间": "Expires",
+  "离最后有效期仅剩{days}天": "Only {days} days until final expiration",
+  "离最后有效期剩余{days}天": "{days} days until final expiration",
   "可用": "Available",
   "已使用": "Used",
   "已过期": "Expired",
