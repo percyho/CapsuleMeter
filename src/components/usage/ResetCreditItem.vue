@@ -62,12 +62,12 @@ const expirationCountdown = computed(() => {
   if (remainingMs === null) return "";
   if (expired.value) return t("有效期已过");
   if (remainingMs < dayMs) return locale.value === "en-US"
-    ? t("离有效期不到1天")
-    : "离有效期仅剩不到1天";
+    ? t("离最后有效期不到1天")
+    : "离最后有效期仅剩不到1天";
   const days = Math.ceil(remainingMs / dayMs);
   return locale.value === "en-US"
     ? `Expires in ${days} ${days === 1 ? "day" : "days"}`
-    : `离有效期${remainingMs <= 3 * dayMs ? "仅剩" : "剩余"}${days}天`;
+    : `离最后有效期${remainingMs <= 3 * dayMs ? "仅剩" : "剩余"}${days}天`;
 });
 const expirationCountdownClass = computed(() => {
   const remainingMs = expirationRemainingMs.value;
