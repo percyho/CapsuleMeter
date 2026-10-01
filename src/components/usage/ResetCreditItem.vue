@@ -6,6 +6,7 @@ import { useLocale } from "../../composables/useLocale";
 const props = defineProps<{
   credit: ResetCredit;
   loading: boolean;
+  now: number;
 }>();
 
 const emit = defineEmits<{
@@ -14,9 +15,29 @@ const emit = defineEmits<{
 
 const { locale, t } = useLocale();
 const confirming = shallowRef(false);
+const apiTextTranslations: Record<string, string> = {
+  "full reset": "完全重置（每周 + 5 小时）",
+  "full reset (weekly + 5-hour)": "完全重置（每周 + 5 小时）",
+  "reset weekly and five-hour limits": "重置每周和 5 小时限额",
+  "reset weekly and 5-hour limits": "重置每周和 5 小时限额",
+  "resets weekly and five-hour limits": "重置每周和 5 小时限额",
+};
+
+function translateCreditText(value: string | null, fallbackKey: string): string {
+  const text = value?.trim();
+  if (!text) return "";
+  const translationKey = apiTextTranslations[text.toLowerCase()] ?? text;
+  const translated = t(translationKey);
+  if (translationKey !== text || translated !== text) return translated;
+
+  const containsOtherLocaleText = locale.value === "zh-CN"
+    ? /\p{Script=Latin}/u.test(text)
+    : /\p{Script=Han}/u.test(text);
+  return containsOtherLocaleText ? t(fallbackKey) : text;
+}
 
 const expired = computed(
-  () => (props.credit.expiresAt !== null && props.credit.expiresAt * 1000 <= Date.now())
+  () => (props.credit.expiresAt !== null && props.credit.expiresAt * 1000 <= props.now)
     || props.credit.status.toLowerCase() === "expired",
 );
 const available = computed(
@@ -37,8 +58,30 @@ const statusClass = computed(() => {
   return "unavailable";
 });
 const title = computed(() =>
-  props.credit.title?.trim() || t("完全重置（每周 + 5 小时）"),
+  translateCreditText(props.credit.title, "完全重置（每周 + 5 小时）")
+    || t("完全重置（每周 + 5 小时）"),
 );
+const description = computed(() =>
+  translateCreditText(props.credit.description, "重置每周和 5 小时限额"),
+);
+const countdownDays = computed(() => {
+  if (!available.value || props.credit.expiresAt === null) return null;
+  const remainingMs = props.credit.expiresAt * 1000 - props.now;
+  return remainingMs > 0 ? Math.ceil(remainingMs / (24 * 60 * 60 * 1000)) : null;
+});
+const countdownClass = computed(() => {
+  if (countdownDays.value === null) return "";
+  if (countdownDays.value <= 3) return "red";
+  if (countdownDays.value <= 7) return "yellow";
+  return "green";
+});
+const countdownLabel = computed(() => {
+  if (countdownDays.value === null) return "";
+  const key = countdownDays.value <= 3
+    ? "离最后有效期仅剩{days}天"
+    : "离最后有效期剩余{days}天";
+  return t(key).replace("{days}", String(countdownDays.value));
+});
 
 function formatDate(epoch: number): string {
   return new Date(epoch * 1000).toLocaleString(locale.value, {
@@ -84,10 +127,15 @@ function requestConsume() {
         {{ loading ? t("处理中…") : confirming ? t("确认使用") : t("使用重置") }}
       </button>
     </div>
-    <p v-if="credit.description" class="reset-description">{{ credit.description }}</p>
+    <p v-if="description" class="reset-description">{{ description }}</p>
     <div class="reset-item-meta">
       <span>{{ t("获得时间") }} · {{ formatDate(credit.grantedAt) }}</span>
-      <span>{{ formatExpiry(credit.expiresAt) }}</span>
+      <span>
+        {{ formatExpiry(credit.expiresAt) }}
+        <span v-if="countdownDays !== null" class="reset-countdown" :class="countdownClass">
+          · {{ countdownLabel }}
+        </span>
+      </span>
     </div>
     <p v-if="confirming" class="reset-warning" role="status">
       {{ t("重置机会使用后不可撤销，再次点击确认。") }}
@@ -106,6 +154,9 @@ function requestConsume() {
 .reset-status.used,.reset-status.expired,.reset-status.unavailable { color: var(--panel-val, #8f97a8); background: rgba(255, 255, 255, 0.08); }
 .reset-description { margin: 0; color: var(--panel-val, #8f97a8); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
 .reset-item-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--panel-val, #8f97a8); font-size: 10px; line-height: 1.4; }
+.reset-countdown.green { color: hsl(144 65% 29%); }
+.reset-countdown.yellow { color: hsl(50 65% 29%); }
+.reset-countdown.red { color: hsl(0 65% 29%); }
 .reset-use { flex: 0 0 auto; border: 0; border-radius: 8px; padding: 7px 10px; background: #202127; color: #fff; font-size: 10px; font-weight: 600; cursor: pointer; }
 .reset-use.confirm { background: #c2414b; }
 .reset-use:disabled { opacity: 0.55; cursor: wait; }

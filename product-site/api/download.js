@@ -1,17 +1,82 @@
 const { Readable } = require("node:stream");
 
-const RELEASE_API = "https://api.github.com/repos/percyho/CapsuleMeter/releases/latest";
-const RELEASE_PAGE = "https://github.com/percyho/CapsuleMeter/releases/latest";
+const RELEASES_API = "https://api.github.com/repos/percyho/CapsuleMeter/releases?per_page=100";
 const RELEASE_ASSET_PREFIX = "/percyho/CapsuleMeter/releases/download/";
 
-function redirectToRelease(response) {
-  response.statusCode = 302;
-  response.setHeader("Location", RELEASE_PAGE);
-  response.setHeader("Cache-Control", "no-store");
-  response.end();
+function stableReleases(releases) {
+  return (Array.isArray(releases) ? releases : [])
+    .filter((release) => release && !release.draft && !release.prerelease && Array.isArray(release.assets))
+    .sort((a, b) => Date.parse(b.published_at || b.created_at || 0) - Date.parse(a.published_at || a.created_at || 0));
 }
 
-module.exports = async function downloadLatestWindowsInstaller(request, response) {
+function findWindowsInstaller(releases) {
+  for (const release of stableReleases(releases)) {
+    const installer = release.assets.find((asset) =>
+      typeof asset.name === "string" &&
+      asset.name.toLowerCase().endsWith("_x64-setup.exe") &&
+      typeof asset.browser_download_url === "string"
+    );
+    if (installer) return installer;
+  }
+  return null;
+}
+
+function isMacInstaller(asset) {
+  if (!asset || typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") return false;
+  const name = asset.name.toLowerCase();
+  return /\.(dmg|pkg)$/i.test(name) || /\.app\.tar\.gz$/i.test(name) ||
+    (/\.zip$/i.test(name) && /mac|macos|osx|darwin|arm64|aarch64|x64|x86_64|universal/i.test(name));
+}
+
+function macArchitecture(asset) {
+  const name = asset.name.toLowerCase();
+  if (/universal2?|universal-/.test(name)) return "universal";
+  if (/aarch64|arm64/.test(name)) return "arm";
+  if (/x86_64|x64|amd64/.test(name)) return "x64";
+  return "any";
+}
+
+function findMacInstaller(releases, architecture) {
+  for (const release of stableReleases(releases)) {
+    const assets = release.assets.filter(isMacInstaller).sort((a, b) => {
+      const rank = (asset) => {
+        const name = asset.name.toLowerCase();
+        return name.endsWith(".dmg") ? 0 : name.endsWith(".pkg") ? 1 : name.endsWith(".zip") ? 2 : 3;
+      };
+      return rank(a) - rank(b);
+    });
+    const universal = assets.find((asset) => macArchitecture(asset) === "universal");
+    const matching = architecture && architecture !== "unknown"
+      ? assets.find((asset) => macArchitecture(asset) === architecture)
+      : null;
+    const generic = assets.find((asset) => macArchitecture(asset) === "any");
+    if (universal || matching || generic) return universal || matching || generic;
+  }
+  return null;
+}
+
+function installerUrl(installer) {
+  if (typeof installer?.browser_download_url !== "string") return null;
+  try {
+    const url = new URL(installer.browser_download_url);
+    return url.protocol === "https:" && url.hostname === "github.com" && url.pathname.startsWith(RELEASE_ASSET_PREFIX)
+      ? url
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function sendUnavailable(response, platform) {
+  response.statusCode = platform === "mac" ? 404 : 503;
+  response.setHeader("Content-Type", "text/plain; charset=utf-8");
+  response.setHeader("Cache-Control", "no-store");
+  response.end(platform === "mac"
+    ? "No compatible macOS installer is available."
+    : "The latest Windows installer is currently unavailable.");
+}
+
+module.exports = async function downloadLatestInstaller(request, response) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.setHeader("Allow", "GET, HEAD");
     response.statusCode = 405;
@@ -19,8 +84,12 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
     return;
   }
 
+  const requestUrl = new URL(request.url || "/download", "https://capsule-meter.local");
+  const platform = requestUrl.searchParams.get("platform") === "mac" ? "mac" : "windows";
+  const architecture = requestUrl.searchParams.get("arch") || "unknown";
+
   try {
-    const releaseResponse = await fetch(RELEASE_API, {
+    const releaseResponse = await fetch(RELEASES_API, {
       headers: {
         accept: "application/vnd.github+json",
         "user-agent": "CapsuleMeter-Website",
@@ -30,29 +99,18 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
     });
 
     if (!releaseResponse.ok) {
-      redirectToRelease(response);
+      sendUnavailable(response, platform);
       return;
     }
 
-    const release = await releaseResponse.json();
-    const installer = release.assets?.find((asset) =>
-      typeof asset.name === "string" &&
-      asset.name.toLowerCase().endsWith("_x64-setup.exe") &&
-      typeof asset.browser_download_url === "string"
-    );
+    const releases = await releaseResponse.json();
+    const installer = platform === "mac"
+      ? findMacInstaller(releases, architecture)
+      : findWindowsInstaller(releases);
+    const downloadUrl = installerUrl(installer);
 
-    if (!installer) {
-      redirectToRelease(response);
-      return;
-    }
-
-    const downloadUrl = new URL(installer.browser_download_url);
-    if (
-      downloadUrl.protocol !== "https:" ||
-      downloadUrl.hostname !== "github.com" ||
-      !downloadUrl.pathname.startsWith(RELEASE_ASSET_PREFIX)
-    ) {
-      redirectToRelease(response);
+    if (!installer || !downloadUrl) {
+      sendUnavailable(response, platform);
       return;
     }
 
@@ -69,7 +127,7 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
     });
 
     if (!installerResponse.ok || !installerResponse.body) {
-      redirectToRelease(response);
+      sendUnavailable(response, platform);
       return;
     }
 
@@ -92,6 +150,6 @@ module.exports = async function downloadLatestWindowsInstaller(request, response
       response.destroy();
       return;
     }
-    redirectToRelease(response);
+    sendUnavailable(response, platform);
   }
 };

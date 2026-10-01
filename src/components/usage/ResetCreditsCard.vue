@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 import type { ResetCreditsSummary } from "../../types/usage";
 import { useLocale } from "../../composables/useLocale";
 import ResetCreditItem from "./ResetCreditItem.vue";
@@ -19,6 +19,18 @@ const emit = defineEmits<{
 
 const expanded = shallowRef(true);
 const confirmingFallback = shallowRef(false);
+const now = shallowRef(Date.now());
+let countdownTimer: number | undefined;
+
+onMounted(() => {
+  countdownTimer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 60_000);
+});
+
+onUnmounted(() => {
+  if (countdownTimer !== undefined) window.clearInterval(countdownTimer);
+});
 
 const credits = computed(() =>
   [...(props.summary?.credits ?? [])].sort((a, b) => b.grantedAt - a.grantedAt),
@@ -26,6 +38,33 @@ const credits = computed(() =>
 const canUseFallback = computed(
   () => credits.value.length === 0 && (props.summary?.availableCount ?? 0) > 0,
 );
+const errorText = computed(() => {
+  const error = props.error;
+  if (!error || locale.value !== "en-US") return error ?? "";
+
+  const translations: Array<[string, string]> = [
+    ["Codex App Server 响应超时", "Codex App Server response timed out"],
+    ["解析 Codex App Server 响应失败：", "Failed to parse Codex App Server response: "],
+    ["Codex App Server 请求失败：", "Codex App Server request failed: "],
+    ["Codex App Server 响应缺少 result", "Codex App Server response is missing result"],
+    ["Codex App Server 响应缺少 rateLimitResetCredits", "Codex App Server response is missing rateLimitResetCredits"],
+    ["Codex App Server 响应缺少 availableCount", "Codex App Server response is missing availableCount"],
+    ["无法启动 Codex App Server：", "Could not start Codex App Server: "],
+    ["无法连接 Codex App Server 输入流", "Could not connect to Codex App Server input"],
+    ["无法连接 Codex App Server 输出流", "Could not connect to Codex App Server output"],
+    ["初始化 Codex App Server 失败：", "Could not initialize Codex App Server: "],
+    ["读取重置机会失败：", "Failed to read reset credits: "],
+    ["重置响应缺少 outcome", "Reset response is missing an outcome"],
+    ["使用重置失败：", "Failed to use reset: "],
+    ["未知错误", "Unknown error"],
+    ["；再次确认将安全重试本次操作", ". Confirming again will safely retry this operation."],
+  ];
+
+  return translations.reduce(
+    (message, [source, translated]) => message.replaceAll(source, translated),
+    error,
+  );
+});
 const hasResetContent = computed(() => {
   if (props.error || !props.summary) return true;
   return credits.value.length > 0 || canUseFallback.value;
@@ -76,7 +115,7 @@ function requestFallbackConsume() {
     </div>
 
     <div v-if="expanded && hasResetContent" class="reset-content">
-      <p v-if="error" class="reset-message error" role="alert">{{ error }}</p>
+      <p v-if="error" class="reset-message error" role="alert">{{ errorText }}</p>
       <p v-if="loading && !summary" class="reset-message">{{ t("加载中…") }}</p>
 
       <ResetCreditItem
@@ -84,6 +123,7 @@ function requestFallbackConsume() {
         :key="credit.id"
         :credit="credit"
         :loading="loading"
+        :now="now"
         @consume="emit('consume', $event)"
       />
 

@@ -2,6 +2,7 @@
 <!-- Icon artwork and animation license notices: THIRD-PARTY-NOTICES.md -->
 <html lang="zh-CN">
 <head>
+<script>(function(){var root=document.documentElement,platform=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent||'';if(/win/i.test(platform))root.setAttribute('data-platform','windows');else if(/mac|macintosh|iphone|ipad|ipod/i.test(platform))root.setAttribute('data-platform','mac');try{if(localStorage.getItem('capsule-site-theme')==='light')root.setAttribute('data-theme','light');}catch(_){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Capsule Meter — 你的 Codex 用量，一眼尽收</title>
@@ -27,6 +28,15 @@
     --font-d:'Sora','Noto Sans SC',system-ui,sans-serif;
     --font-b:'Noto Sans SC',system-ui,sans-serif;
   }
+  html[data-theme="light"]{
+    --bg:#f5f6f8;--bg2:#eceff3;--surface:#fff;--surface2:#edf0f4;--ink:#171a20;--muted:#59616d;--line:rgba(23,26,32,.12);
+  }
+  html{view-transition-name:root}
+  ::view-transition-group(root){animation-duration:.72s}
+  ::view-transition-old(root){z-index:1;animation:none}
+  ::view-transition-new(root){z-index:2;animation:none;clip-path:circle(0 at var(--theme-origin-x,calc(100% - 52px)) var(--theme-origin-y,32px));animation:theme-reveal .72s cubic-bezier(.2,.75,.2,1) forwards}
+  @keyframes theme-reveal{to{clip-path:circle(var(--theme-reveal-radius,160vmax) at var(--theme-origin-x,calc(100% - 52px)) var(--theme-origin-y,32px))}}
+  @media(prefers-reduced-motion:reduce){::view-transition-group(root){animation-duration:.01ms!important}::view-transition-new(root){animation-duration:.01ms!important}}
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{background:var(--bg);color:var(--ink);font-family:var(--font-b);line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -45,12 +55,63 @@
   .nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color .2s}
   .nav-links a:hover{color:var(--ink)}
   .nav-actions{display:flex;align-items:center;gap:10px}
+  .theme-toggle{display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--ink);cursor:pointer;transition:background .2s,border-color .2s,transform .2s}
+  .theme-toggle:hover{background:rgba(127,137,150,.12);border-color:rgba(127,137,150,.35);transform:rotate(-8deg)}
+  .theme-toggle:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  .theme-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .theme-icon-moon{display:none}
+  html[data-theme="light"] .theme-icon-sun{display:none}
+  html[data-theme="light"] .theme-icon-moon{display:block}
   .lang-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:72px;height:38px;padding:0 11px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;cursor:pointer;font-size:12px;font-weight:700;transition:background .2s,border-color .2s}
   .lang-toggle:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2)}
   .lang-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .nav-cta{display:inline-flex;align-items:center;gap:8px;background:#303943;color:#fff;font-size:14px;font-weight:600;padding:9px 20px;border-radius:999px;transition:transform .2s,background .2s}
   .nav-cta:hover{transform:translateY(-1px);background:#3a4652}
+  html[data-theme="light"] header.nav{background:rgba(245,246,248,.94)}
+  html[data-theme="light"] .demo-stage{background:#e9edf2;border-color:#d4dae2;box-shadow:0 24px 50px -32px rgba(25,35,50,.24)}
+  html[data-theme="light"] .demo-stage .stage-label{color:#59616d}
+  html[data-theme="light"] .demo-hint code{background:rgba(23,26,32,.08)}
+  html[data-theme="light"] .btn.ghost{background:rgba(23,26,32,.025)}
+  html[data-theme="light"] .btn.ghost:hover{background:rgba(23,26,32,.06);border-color:rgba(23,26,32,.22)}
+  html[data-theme="light"] #download .mac-download{color:#252a32;border-color:rgba(23,26,32,.2)}
+  html[data-theme="light"] #download .mac-download:hover{background:rgba(23,26,32,.05);border-color:rgba(23,26,32,.3)}
+  html[data-theme="light"] .bar{background:rgba(23,26,32,.09)}
+  .platform-picker{position:relative;display:inline-flex}
+  .platform-trigger{font:inherit;cursor:pointer}
+  #top .hero-ctas .platform-picker{display:inline-flex;align-items:stretch;border-radius:12px;box-shadow:0 8px 22px rgba(4,10,20,.22)}
+  #top .hero-ctas .platform-trigger{position:relative;display:inline-flex;align-items:center;gap:11px;min-width:132px;min-height:56px;padding:0 15px 0 20px;border:1px solid rgba(153,190,238,.25);border-right:0;border-radius:12px 0 0 12px;background:linear-gradient(135deg,#3b4b5d,#2d3947);color:#f7f9fc;box-shadow:inset 0 1px rgba(255,255,255,.12);transition:transform .2s,background .2s,border-color .2s,box-shadow .2s}
+  #top .hero-ctas .platform-trigger:hover{transform:translateY(-2px);background:linear-gradient(135deg,#46596e,#354455);border-color:rgba(168,201,245,.44);box-shadow:inset 0 1px rgba(255,255,255,.16)}
+  #top .hero-ctas .platform-trigger:focus-visible{outline:2px solid #8db9ff;outline-offset:3px}
+  #top .hero-ctas .platform-trigger>svg{width:18px;height:18px}
+  .platform-trigger-label{flex:1;text-align:left;white-space:nowrap}
+  .platform-menu-trigger{display:grid;place-items:center;width:43px;min-height:56px;padding:0;border:1px solid rgba(153,190,238,.25);border-radius:0 12px 12px 0;background:linear-gradient(135deg,#354457,#2b3744);color:rgba(255,255,255,.86);cursor:pointer;transition:background .2s,border-color .2s,transform .2s}
+  .platform-menu-trigger:hover{background:#46596e;border-color:rgba(168,201,245,.44)}
+  .platform-menu-trigger:focus-visible{outline:2px solid #8db9ff;outline-offset:3px}
+  .platform-menu-trigger svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+  .platform-menu-trigger[aria-expanded="true"] svg{transform:rotate(180deg)}
+  .platform-menu{position:absolute;z-index:70;top:calc(100% + 8px);right:0;min-width:190px;padding:6px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#20252c;box-shadow:0 14px 34px rgba(0,0,0,.38)}
+  .platform-menu[hidden]{display:none}
+  #hero-download-menu{right:0;min-width:258px;padding:7px;border-color:rgba(255,255,255,.13);border-radius:14px;background:rgba(28,32,39,.98);box-shadow:0 18px 42px rgba(0,0,0,.36)}
+  .platform-menu a{display:flex;align-items:center;gap:12px;min-height:54px;padding:9px 11px;border-radius:9px;color:var(--ink);font-size:14px;white-space:nowrap;transition:background .18s,transform .18s}
+  .platform-menu a:hover,.platform-menu a:focus-visible{background:rgba(255,255,255,.08);outline:none;transform:translateX(2px)}
+  .platform-menu a>svg:first-child{width:20px;height:20px;flex:none;fill:currentColor}
+  .platform-menu .platform-option-copy{display:grid;gap:1px;flex:1}
+  .platform-menu .platform-option-copy strong{font-size:13px;font-weight:600}
+  .platform-menu small{display:block;color:var(--muted);font-size:11px;line-height:1.4}
+  .platform-menu .platform-option-arrow{width:15px;height:15px;fill:none;stroke:var(--muted);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .platform-download-notice{position:fixed;z-index:100;right:24px;bottom:24px;width:min(390px,calc(100vw - 32px));padding:13px 16px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:rgba(28,32,39,.97);color:#f0f1f2;box-shadow:0 14px 36px rgba(0,0,0,.3);font-size:13px;line-height:1.5;animation:platform-notice-in .22s ease-out both}
+  .platform-download-notice[hidden]{display:none}
+  @keyframes platform-notice-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  html[data-theme="light"] .platform-download-notice{border-color:rgba(23,26,32,.12);background:rgba(255,255,255,.98);color:#171a20;box-shadow:0 14px 36px rgba(29,39,54,.16)}
+  html[data-theme="light"] #hero-download-menu{border-color:rgba(23,26,32,.12);background:rgba(255,255,255,.98);box-shadow:0 18px 42px rgba(29,39,54,.16)}
+  html[data-theme="light"] .platform-menu a:hover,html[data-theme="light"] .platform-menu a:focus-visible{background:rgba(23,26,32,.06)}
+  html[data-theme="light"] .hero-ctas .platform-trigger{background:linear-gradient(135deg,#344b63,#24384e);border-color:rgba(71,105,145,.25);box-shadow:0 8px 22px rgba(39,57,79,.16),inset 0 1px rgba(255,255,255,.16)}
+  html[data-theme="light"] .hero-ctas .platform-trigger:hover{background:linear-gradient(135deg,#405d7a,#2e4964);border-color:rgba(71,105,145,.42)}
+  html[data-theme="light"] .hero-ctas .platform-picker{box-shadow:0 8px 22px rgba(39,57,79,.16)}
+  html[data-theme="light"] .platform-menu-trigger{background:linear-gradient(135deg,#344b63,#24384e);border-color:rgba(71,105,145,.25);color:#f7f9fc}
+  html[data-theme="light"] .platform-menu-trigger:hover{background:linear-gradient(135deg,#405d7a,#2e4964);border-color:rgba(71,105,145,.42)}
+  .platform-caret{width:0;height:0;border:4px solid transparent;border-top-color:currentColor;transform:translateY(2px)}
   a[href="/download"]{position:relative;isolation:isolate;overflow:hidden}
   a[href="/download"] .download-progress{position:absolute;z-index:0;inset:0 auto 0 0;width:var(--download-progress,0%);border-radius:inherit;background:#050607;transition:width .12s linear;pointer-events:none}
   a[href="/download"] .download-progress.is-indeterminate{width:36%;animation:download-progress-indeterminate 1.15s ease-in-out infinite}
@@ -71,7 +132,7 @@
   @media(max-width:720px){.nav-links{display:none}}
 
   /* ===== Hero ===== */
-  .hero{position:relative;padding:92px 0 110px;overflow:hidden}
+  .hero{position:relative;padding:92px 0 110px;overflow:visible}
   .hero::before,.hero::after{content:none}
   .hero-grid{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center}
   .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#9bbce4;border:1px solid rgba(155,188,228,.24);background:rgba(155,188,228,.06);padding:6px 14px;border-radius:999px;margin-bottom:26px}
@@ -81,6 +142,7 @@
   .hero h1 .cor{color:#c99893}
   .hero p.lead{font-size:18px;color:var(--muted);max-width:560px;margin-bottom:34px;font-weight:400}
   .hero-ctas{display:flex;gap:16px;flex-wrap:wrap}
+  #top .platform-picker{z-index:5}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-family:var(--font-d);font-size:15px;font-weight:600;padding:14px 26px;border-radius:12px;transition:transform .2s,box-shadow .2s,background .2s}
   .btn.primary{background:#35414c;color:#fff}
   .btn.primary:hover{transform:translateY(-2px);background:#43515e;box-shadow:0 8px 20px rgba(0,0,0,.22)}
@@ -338,18 +400,24 @@
   .cta-box p a{color:var(--indigo);text-decoration:underline;text-decoration-color:rgba(120,169,255,.55);text-underline-offset:3px}
   .cta-box p a:hover{color:#b5d5ff;text-decoration-color:currentColor}
   .cta-box p a:focus-visible{outline:2px solid var(--indigo);outline-offset:3px;border-radius:2px}
-  #download .hero-ctas{flex-direction:column;align-items:center;gap:18px}
-  #download .install-download{width:min(400px,100%);min-height:72px;border-radius:15px;background:#4a5869;color:#f0f1f2;font-size:18px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+  #download .download-actions{display:flex;flex-direction:row;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap}
+  #download .install-download,#download .mac-download{width:min(320px,calc(50% - 8px));min-height:72px;border-radius:15px;font-size:18px}
+  #download .install-download{background:#4a5869;color:#f0f1f2;box-shadow:0 8px 24px rgba(0,0,0,.18)}
   #download .install-download:hover{background:#56667a;transform:translateY(-1px);box-shadow:0 10px 28px rgba(0,0,0,.24)}
+  #download .mac-download{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:transparent;color:#d8dde5;border:1px solid rgba(255,255,255,.16);white-space:nowrap}
+  #download .mac-download:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.28);transform:translateY(-1px)}
   #download .install-download svg{width:22px;height:22px}
   #download .install-download .windows-logo{width:30px;height:30px;fill:currentColor;stroke:none}
+  #download .mac-download svg{display:block;width:22px;height:22px;flex:none;fill:currentColor;stroke:none}
+  html[data-platform="windows"] #download .mac-download{display:none}
+  html[data-platform="mac"] #download .windows-download{display:none}
   #download .github-source{gap:10px;padding:2px 8px;border:0;background:transparent;color:#55aaff;font-size:18px;font-weight:500}
   #download .github-source:hover{border:0;background:transparent;color:#80c2ff}
   #download .github-source svg{width:19px;height:19px;color:inherit}
   #download .github-source .github-body,#download .github-source .github-tail{fill:currentColor;stroke:none}
   #download .github-source .github-body{stroke:currentColor;stroke-width:1.4}
   #download .github-source .github-tail{stroke:currentColor;stroke-width:1.8}
-  @media(max-width:600px){#download .install-download{min-height:64px;font-size:16px}#download .github-source{font-size:16px}}
+  @media(max-width:600px){#download .install-download,#download .mac-download{width:min(400px,100%);min-height:64px;font-size:16px}#download .github-source{font-size:16px}}
   footer{border-top:1px solid var(--line);padding:34px 0}
   .foot-in{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
   .foot-in .brand span{font-size:13px}
@@ -379,10 +447,10 @@
         <svg data-animated-icon data-animation="earth" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"/><path d="M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"/><path d="M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"/><circle cx="12" cy="12" r="10"/></svg>
         <span class="lang-label">EN</span>
       </button>
-      <a class="nav-cta" href="/download">
-        <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
-        <span data-download-label>下载</span>
-      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换为浅色主题" title="切换为浅色主题">
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.4A8.5 8.5 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4Z"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -395,11 +463,17 @@
       <h1>你的 <span class="ind">Codex</span> 用量，<br>一眼尽收</h1>
       <p class="lead">一个悬浮在桌角的胶囊小部件，实时显示本机 Codex CLI 登录账号的 5 小时与每周用量剩余。无边框、可贴边、可换肤，历史数据只存本地。</p>
       <div class="hero-ctas">
-        <a class="btn primary install-download" data-icon-trigger href="/download">
-          <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
+        <div class="platform-picker">
+        <button class="btn primary install-download platform-trigger" data-icon-trigger data-auto-download type="button" aria-label="识别系统并下载">
           <svg data-animated-icon data-animation="download" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><g class="download-arrow"><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></g></svg>
-          <span data-download-label>立即下载</span>
-        </a>
+          <span class="platform-trigger-label" data-download-label>立即下载</span>
+        </button>
+        <button class="platform-menu-trigger" id="platformMenuTrigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="hero-download-menu" aria-label="选择系统版本" title="选择系统版本"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>
+        <div class="platform-menu" id="hero-download-menu" role="menu" hidden>
+          <a role="menuitem" href="/download" data-platform="windows"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4.1 10.5 2.9v8H2V4.1Zm10-1.4L22 1v9.9H12V2.7ZM2 12.1h8.5v8L2 18.9v-6.8Zm10 0h10V22l-10-1.4v-8.5Z"/></svg><span class="platform-option-copy"><strong data-platform-label="windows" data-zh="下载 Windows 版" data-en="Download for Windows">下载 Windows 版</strong><small data-platform-note="windows" data-zh="适用于 Windows 10/11" data-en="For Windows 10 and 11">适用于 Windows 10/11</small></span><svg class="platform-option-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11m-5-5 5 5-5 5"/></svg></a>
+          <a role="menuitem" href="#" data-platform="mac" data-mac-download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 1.43c0 1.14-.42 2.24-1.17 3.07-.8.87-2.1 1.54-3.24 1.45-.15-1.1.4-2.3 1.14-3.1.8-.87 2.2-1.5 3.27-1.42ZM20.9 17.55c-.47 1.08-.7 1.56-1.3 2.51-.84 1.3-2.02 2.92-3.48 2.93-1.3.01-1.64-.85-3.4-.84-1.75.01-2.13.86-3.43.85-1.46-.02-2.58-1.47-3.42-2.77-2.35-3.64-2.6-7.9-1.15-10.18 1.03-1.62 2.66-2.57 4.2-2.57 1.57 0 2.56.86 3.86.86 1.26 0 2.03-.86 3.84-.86 1.37 0 2.83.75 3.86 2.05-3.4 1.87-2.85 6.72.42 8.02Z"/></svg><span class="platform-option-copy"><strong data-platform-label="mac" data-zh="下载最新 macOS 版本" data-en="Download latest macOS version">下载最新 macOS 版本</strong><small data-platform-note="mac" data-zh="自动下载最新安装包" data-en="Downloads the latest installer">自动下载最新安装包</small></span><svg class="platform-option-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11m-5-5 5 5-5 5"/></svg></a>
+        </div>
+        </div>
         <a class="btn ghost feature-preview" data-icon-trigger href="#features">
           <svg data-animated-icon data-animation="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
           <span>查看功能特性</span>
@@ -629,10 +703,14 @@
     <h2>把用量放进桌角，把注意力留给代码</h2>
     <p>支持开机自启、系统托盘与动态双层用量环。<a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT 开源协议</a>。</p>
     <div class="hero-ctas download-actions" style="justify-content:center">
-      <a class="btn primary install-download" href="/download">
+      <a class="btn primary install-download windows-download" href="/download">
         <span class="download-progress" role="progressbar" aria-label="下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></span>
         <svg class="windows-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4.1 10.5 2.9v8H2V4.1Zm10-1.4L22 1v9.9H12V2.7ZM2 12.1h8.5v8L2 18.9v-6.8Zm10 0h10V22l-10-1.4v-8.5Z"/></svg>
         <span data-download-label>下载 Windows 安装包</span>
+      </a>
+      <a class="btn mac-download" href="#" data-mac-download data-zh="下载最新 macOS 版本" data-en="Download latest macOS version">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 1.43c0 1.14-.42 2.24-1.17 3.07-.8.87-2.1 1.54-3.24 1.45-.15-1.1.4-2.3 1.14-3.1.8-.87 2.2-1.5 3.27-1.42ZM20.9 17.55c-.47 1.08-.7 1.56-1.3 2.51-.84 1.3-2.02 2.92-3.48 2.93-1.3.01-1.64-.85-3.4-.84-1.75.01-2.13.86-3.43.85-1.46-.02-2.58-1.47-3.42-2.77-2.35-3.64-2.6-7.9-1.15-10.18 1.03-1.62 2.66-2.57 4.2-2.57 1.57 0 2.56.86 3.86.86 1.26 0 2.03-.86 3.84-.86 1.37 0 2.83.75 3.86 2.05-3.4 1.87-2.85 6.72.42 8.02Z"/></svg>
+        <span data-zh="下载最新 macOS 版本" data-en="Download latest macOS version">下载最新 macOS 版本</span>
       </a>
       <a class="btn ghost github-source" data-icon-trigger href="https://github.com/percyho/CapsuleMeter" target="_blank" rel="noopener">
         <svg data-animated-icon viewBox="0 0 24 24" aria-hidden="true"><path class="github-body" d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path class="github-tail" d="M9 18c-4.51 2-5-2-7-2"/></svg>
@@ -657,13 +735,16 @@
   // ===== 中英文切换 =====
   (function(){
     var toggle=document.getElementById('languageToggle');
+    var themeToggle=document.getElementById('themeToggle');
+    var platformMenuTrigger=document.getElementById('platformMenuTrigger');
+    var autoDownloadTrigger=document.querySelector('[data-auto-download]');
     var savedChoice=localStorage.getItem('capsule-site-language-choice');
     var countryCookie=(document.cookie.match(/(?:^|;\s*)capsule-ip-language=(zh|en)(?:;|$)/)||[])[1];
     var browserLanguage=(navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en';
     var language=savedChoice||countryCookie||browserLanguage;
     var translations={
       en:{
-        'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','header .nav-cta [data-download-label]':'Download',
+        'header .nav-links a:nth-child(1)':'Features','header .nav-links a:nth-child(2)':'History','header .nav-links a:nth-child(3)':'Themes','header .nav-links a:nth-child(4)':'Privacy','#hero-download-menu [data-platform-label="windows"]':'Download for Windows','#hero-download-menu [data-platform-label="mac"]':'Download latest macOS version','#hero-download-menu [data-platform-note="windows"]':'For Windows 10 and 11','#hero-download-menu [data-platform-note="mac"]':'Downloads the latest installer',
         '.eyebrow span':'Windows desktop usage widget','.hero h1':'Your <span class="ind">Codex</span> usage,<br>at a glance','.hero p.lead':'A small capsule widget that floats in the corner of your desktop, showing the signed-in Codex CLI account’s remaining 5-hour and weekly usage in real time. Borderless, edge-snapping, and customizable, with history stored locally.',
         '#top .hero-ctas .btn.primary [data-download-label]':'Download now','#top .hero-ctas .btn.ghost span':'Explore features',
         '.demo-dots .dd:nth-child(1) span':'Steady usage','.demo-dots .dd:nth-child(2) span':'Fast usage','.demo-hint':'Click either side to view its reset time. It returns to the usage value after 5 seconds','#demoThemePrefix':'Capsule preview ·',
@@ -683,7 +764,7 @@
         'body > section.sec:nth-of-type(6) .sec-head .kicker':'USAGE SPEED','body > section.sec:nth-of-type(6) .sec-head h2':'Colored dots show how quickly usage is changing','body > section.sec:nth-of-type(6) .sec-head p':'The dots on either side of the capsule correspond to the 5-hour and weekly limits. Their colors reflect recent usage speed; hover for an estimate.',
         '.sp.gray b':'Gray','.sp.gray span':'Evaluating · Not enough data','.sp.green b':'Green','.sp.green span':'Steady usage','.sp.blue b':'Blue','.sp.blue span':'Normal usage','.sp.orange b':'Orange','.sp.orange span':'Fast usage','.sp.red b':'Red','.sp.red span':'Very fast usage',
         '#privacy h3':'Privacy commitment','#privacy .priv li:nth-child(1)':'<b>Tokens stay on your device</b> — Access, refresh, and ID tokens are used only by the local Rust backend. They are never exposed to the frontend or third parties.','#privacy .priv li:nth-child(2)':'<b>Only the account email is shown</b> — The email is read locally from the ID token. No other sensitive information is displayed.','#privacy .priv li:nth-child(3)':'<b>History stays on your device</b> — Usage samples are stored locally. Export them or clear them at any time.',
-        '#download h2':'Keep usage in the corner and focus on your code','#download p':'Supports launch at startup, the system tray, and a live dual-window usage display. <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT License</a>.','#download .btn.primary [data-download-label]':'Download for Windows','#download .btn.ghost span':'View source · GitHub',
+        '#download h2':'Keep usage in the corner and focus on your code','#download p':'Supports launch at startup, the system tray, and a live dual-window usage display. <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">MIT License</a>.','#download .btn.primary [data-download-label]':'Download for Windows','#download .mac-download span':'Download latest macOS version','#download .btn.ghost span':'View source · GitHub',
         '.foot-links a:nth-child(1)':'Features','.foot-links a:nth-child(2)':'History','.foot-links a:nth-child(3)':'Themes','.foot-links a:nth-child(4)':'Privacy','footer .foot-in > span':'© 2026 Capsule Meter · Windows x64'
       }
     };
@@ -713,9 +794,27 @@
       toggle.setAttribute('aria-label',toggleLabel);
       toggle.title=toggleLabel;
       toggle.querySelector('.lang-label').textContent=next==='en'?'中文':'EN';
+      var platformLabel=next==='en'?'Choose platform':'选择系统版本';
+      platformMenuTrigger.setAttribute('aria-label',platformLabel);platformMenuTrigger.title=platformLabel;
+      autoDownloadTrigger.setAttribute('aria-label',next==='en'?'Download for this system':'识别系统并下载');
+      updateThemeLabel();
       if(rememberChoice)localStorage.setItem('capsule-site-language-choice',next);
     }
     toggle.addEventListener('click',function(){applyLanguage(language==='zh'?'en':'zh',true);});
+    function updateThemeLabel(){
+      var light=document.documentElement.getAttribute('data-theme')==='light';
+      var label=language==='en'?(light?'Switch to dark theme':'Switch to light theme'):(light?'切换为深色主题':'切换为浅色主题');
+      themeToggle.setAttribute('aria-label',label);themeToggle.title=label;
+    }
+    themeToggle.addEventListener('click',function(){
+      var root=document.documentElement,next=root.getAttribute('data-theme')==='light'?'dark':'light';
+      var rect=themeToggle.getBoundingClientRect(),x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+      var radius=Math.hypot(Math.max(x,window.innerWidth-x),Math.max(y,window.innerHeight-y));
+      root.style.setProperty('--theme-origin-x',x+'px');root.style.setProperty('--theme-origin-y',y+'px');root.style.setProperty('--theme-reveal-radius',radius+'px');
+      var apply=function(){if(next==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');updateThemeLabel();};
+      if(document.startViewTransition&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches)document.startViewTransition(apply);else apply();
+      try{localStorage.setItem('capsule-site-theme',next);}catch(_){}
+    });
     applyLanguage(language,false);
     window.capsuleSiteLanguage=function(){return language;};
   })();
@@ -1046,14 +1145,81 @@
     });
   });
 
-  // Stream the installer through the same-origin Netlify endpoint so the page can show byte-level progress.
+  // Platform download menus
+  (function(){
+    var pickers=Array.from(document.querySelectorAll('.platform-picker'));
+    var notice,noticeTimer;
+    function closePicker(picker){var trigger=picker.querySelector('.platform-menu-trigger'),menu=picker.querySelector('.platform-menu');menu.hidden=true;trigger.setAttribute('aria-expanded','false');}
+    function showDownloadNotice(message){
+      if(!notice){notice=document.createElement('div');notice.className='platform-download-notice';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');document.body.appendChild(notice);}
+      notice.textContent=message;notice.hidden=false;
+      if(noticeTimer)window.clearTimeout(noticeTimer);
+      noticeTimer=window.setTimeout(function(){notice.hidden=true;},6000);
+    }
+    window.capsuleShowDownloadNotice=showDownloadNotice;
+    var releasesApi='https://api.github.com/repos/percyho/CapsuleMeter/releases?per_page=100';
+    function stableReleases(releases){return (Array.isArray(releases)?releases:[]).filter(function(release){return release&&!release.draft&&!release.prerelease&&Array.isArray(release.assets);}).sort(function(a,b){return Date.parse(b.published_at||b.created_at||0)-Date.parse(a.published_at||a.created_at||0);});}
+    function isMacAsset(asset){if(!asset||typeof asset.name!=='string'||typeof asset.browser_download_url!=='string')return false;var name=asset.name.toLowerCase();return /\.(dmg|pkg)$/i.test(name)||/\.app\.tar\.gz$/i.test(name)||(/\.zip$/i.test(name)&&/mac|macos|osx|darwin|arm64|aarch64|x64|x86_64|universal/i.test(name));}
+    function macAssetArchitecture(asset){var name=asset.name.toLowerCase();if(/universal2?|universal-/.test(name))return 'universal';if(/aarch64|arm64/.test(name))return 'arm';if(/x86_64|x64|amd64/.test(name))return 'x64';return 'any';}
+    function latestWindowsAsset(releases){for(var release of releases){var asset=release.assets.find(function(item){return typeof item.name==='string'&&item.name.toLowerCase().endsWith('_x64-setup.exe')&&typeof item.browser_download_url==='string';});if(asset)return asset;}return null;}
+    function latestMacAsset(releases,architecture){for(var release of releases){var assets=release.assets.filter(isMacAsset).sort(function(a,b){function rank(item){var name=item.name.toLowerCase();return name.endsWith('.dmg')?0:name.endsWith('.pkg')?1:name.endsWith('.zip')?2:3;}return rank(a)-rank(b);});var universal=assets.find(function(asset){return macAssetArchitecture(asset)==='universal';});var matching=architecture&&architecture!=='unknown'?assets.find(function(asset){return macAssetArchitecture(asset)===architecture;}):null;var generic=assets.find(function(asset){return macAssetArchitecture(asset)==='any';});if(universal||matching||generic)return universal||matching||generic;}return null;}
+    async function findLatestInstaller(platform,architecture){var response=await fetch(releasesApi,{headers:{accept:'application/vnd.github+json'},cache:'no-store'});if(!response.ok)throw new Error('Could not load GitHub releases');var releases=stableReleases(await response.json()),installer=platform==='mac'?latestMacAsset(releases,architecture):latestWindowsAsset(releases);if(!installer||typeof installer.browser_download_url!=='string')return null;var url=new URL(installer.browser_download_url);if(url.protocol!=='https:'||url.hostname!=='github.com'||url.pathname.indexOf('/percyho/CapsuleMeter/releases/download/')!==0)return null;return installer;}
+    window.capsuleFindLatestInstaller=findLatestInstaller;
+    async function detectedMacArchitecture(){
+      var value='';
+      try{if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){var hints=await navigator.userAgentData.getHighEntropyValues(['architecture']);value=hints.architecture||'';}}catch(_){}
+      if(!value)value=navigator.userAgent||'';
+      value=value.toLowerCase();
+      if(/arm64|aarch64|(^|[^a-z])arm([^a-z]|$)/.test(value))return 'arm';
+      if(/x86|x64|amd64/.test(value))return 'x64';
+      return null;
+    }
+    async function downloadLatestMac(){
+      showDownloadNotice(isEnglishText()?'Checking for the latest macOS installer…':'正在查找最新 macOS 安装包…');
+      try{
+        var architecture=await detectedMacArchitecture()||'unknown';
+        if(window.location.protocol==='file:'){
+          var localInstaller=await findLatestInstaller('mac',architecture);
+          if(!localInstaller){showDownloadNotice(isEnglishText()?'No compatible macOS installer is available in the latest releases.':'最新发布中没有适用于这台 Mac 的安装包。');return;}
+          window.location.assign(localInstaller.browser_download_url);
+          showDownloadNotice(isEnglishText()?'Starting the latest macOS download…':'正在启动最新 macOS 版本下载…');
+          return;
+        }
+        var endpoint='/download';
+        var response=await fetch(endpoint+'?platform=mac&arch='+encodeURIComponent(architecture),{cache:'no-store'});
+        if(response.status===404){showDownloadNotice(isEnglishText()?'No compatible macOS installer is available in the latest release.':'最新发布中没有适用于这台 Mac 的安装包。');return;}
+        var contentType=(response.headers.get('content-type')||'').toLowerCase();
+        if(!response.ok||!response.body||contentType.indexOf('application/octet-stream')===-1)throw new Error('macOS download unavailable');
+        var disposition=response.headers.get('content-disposition')||'',match=disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i),filename='CapsuleMeter-macOS-installer.dmg';
+        if(match){try{filename=decodeURIComponent(match[1]||match[2]);}catch(_){filename=match[1]||match[2];}}
+        filename=filename.replace(/[\\/:*?"<>|]/g,'_');
+        var blob=await response.blob(),objectUrl=URL.createObjectURL(blob),anchor=document.createElement('a');
+        anchor.href=objectUrl;anchor.download=filename;anchor.hidden=true;document.body.appendChild(anchor);anchor.click();anchor.remove();
+        window.setTimeout(function(){URL.revokeObjectURL(objectUrl);},60000);
+        showDownloadNotice(isEnglishText()?'Starting the latest macOS download…':'正在启动最新 macOS 版本下载…');
+      }catch(_){showDownloadNotice(isEnglishText()?'Could not retrieve the latest macOS installer. Please try again later.':'暂时无法获取最新 macOS 安装包，请稍后重试。');}
+    }
+    function isEnglishText(){return window.capsuleSiteLanguage&&window.capsuleSiteLanguage()==='en';}
+    pickers.forEach(function(picker){
+      var autoDownload=picker.querySelector('[data-auto-download]'),menuTrigger=picker.querySelector('.platform-menu-trigger'),menu=picker.querySelector('.platform-menu');
+      function openMenu(){pickers.forEach(closePicker);menu.hidden=false;menuTrigger.setAttribute('aria-expanded','true');}
+      function detectedPlatform(){var value=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent||'';if(/win/i.test(value))return 'windows';if(/mac|macintosh|iphone|ipad|ipod/i.test(value))return 'mac';return null;}
+      autoDownload.addEventListener('click',function(){var platform=detectedPlatform(),option=platform&&menu.querySelector('[data-platform="'+platform+'"]');if(option)option.click();else openMenu();});
+      menuTrigger.addEventListener('click',function(){var opening=menu.hidden;pickers.forEach(closePicker);if(opening){menu.hidden=false;menuTrigger.setAttribute('aria-expanded','true');}});
+      menu.addEventListener('click',function(event){if(event.target.closest('a'))closePicker(picker);});
+      menuTrigger.addEventListener('keydown',function(event){if(event.key==='ArrowDown'){event.preventDefault();openMenu();var first=menu.querySelector('a');if(first)first.focus();}});
+      menu.addEventListener('keydown',function(event){var links=Array.from(menu.querySelectorAll('a')),index=links.indexOf(document.activeElement);if(event.key==='Escape'){closePicker(picker);menuTrigger.focus();}else if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();links[(index+(event.key==='ArrowDown'?1:links.length-1))%links.length].focus();}});
+    });
+    document.querySelectorAll('[data-mac-download]').forEach(function(link){link.addEventListener('click',function(event){event.preventDefault();var picker=link.closest('.platform-picker');if(picker)closePicker(picker);downloadLatestMac();});});
+    document.addEventListener('click',function(event){if(!event.target.closest('.platform-picker'))pickers.forEach(closePicker);});
+    document.addEventListener('keydown',function(event){if(event.key==='Escape')pickers.forEach(closePicker);});
+  })();
+
+  // Stream the installer through the same-origin or Netlify endpoint so the page can show byte-level progress.
   (function(){
     var downloadLinks=Array.from(document.querySelectorAll('a[href="/download"]'));
     if(!downloadLinks.length)return;
     var streamProxy='https://capsule-meter-product-preview.netlify.app/download?progress=1';
-    var releaseApi='https://api.github.com/repos/percyho/CapsuleMeter/releases/latest';
-    var releasePage='https://github.com/percyho/CapsuleMeter/releases/latest';
-    var releaseAssetPrefix='/percyho/CapsuleMeter/releases/download/';
     var busy=false,resetTimer;
     function isEnglish(){return window.capsuleSiteLanguage&&window.capsuleSiteLanguage()==='en';}
     function idleLabel(link){
@@ -1113,20 +1279,19 @@
       anchor.href=objectUrl;anchor.download=filename;anchor.hidden=true;document.body.appendChild(anchor);anchor.click();anchor.remove();
       window.setTimeout(function(){URL.revokeObjectURL(objectUrl);},60000);
     }
-    async function startDirectDownload(){
-      if(window.location.protocol!=='file:'){window.location.assign('/download');return;}
-      try{
-        var response=await fetch(releaseApi,{headers:{accept:'application/vnd.github+json','x-github-api-version':'2022-11-28'}});
-        if(!response.ok)throw new Error('Latest release unavailable');
-        var release=await response.json();
-        var installer=(release.assets||[]).find(function(asset){return asset.name&&asset.name.toLowerCase().endsWith('_x64-setup.exe')&&asset.browser_download_url;});
-        if(!installer)throw new Error('Windows installer unavailable');
-        var url=new URL(installer.browser_download_url);
-        if(url.protocol!=='https:'||url.hostname!=='github.com'||!url.pathname.startsWith(releaseAssetPrefix))throw new Error('Unexpected installer URL');
-        window.location.assign(url.href);
-      }catch(_){window.location.assign(releasePage);}
+    function showDownloadUnavailable(){
+      var noticeText=isEnglish()?'The download service is temporarily unavailable. Please try again later.':'下载服务暂时不可用，请稍后重试。';
+      if(typeof window.capsuleShowDownloadNotice==='function')window.capsuleShowDownloadNotice(noticeText);
+      else window.alert(noticeText);
     }
     async function download(link){
+      if(window.location.protocol==='file:'){
+        var localInstaller=await window.capsuleFindLatestInstaller('windows','unknown');
+        if(!localInstaller)throw new Error('No Windows installer is available in the latest releases');
+        setState(link,'fallback',0);
+        window.location.assign(localInstaller.browser_download_url);
+        return;
+      }
       var response=await getProgressResponse();
       var total=Number(response.headers.get('content-length'))||0,loaded=0,reader=response.body.getReader(),chunks=[];
       setState(link,'downloading',total?0:null);
@@ -1148,7 +1313,7 @@
         busy=true;if(resetTimer)window.clearTimeout(resetTimer);
         setState(link,'preparing',null);
         try{await download(link);}
-        catch(_){setState(link,'fallback',0);await startDirectDownload();}
+        catch(_){setState(link,'fallback',0);showDownloadUnavailable();}
         finally{
           busy=false;
           resetTimer=window.setTimeout(function(){restore(link);},4000);
